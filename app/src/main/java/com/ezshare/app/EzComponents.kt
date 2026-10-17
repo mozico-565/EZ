@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -28,11 +29,12 @@ data class Category(val label:String,val icon:Int,val tint:Color)
 val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.CategoryPink),Category("الفيديوهات",R.drawable.ic_video_camera,EzTokens.CategoryPurple),Category("التطبيقات",R.drawable.ic_android_logo,EzTokens.CategoryBlue),Category("المستندات",R.drawable.ic_file_text,EzTokens.Peach))
 @Composable fun HomeContent(onFiles:(String)->Unit,onReceive:()->Unit,onPrivacy:()->Unit,latest:HistoryEntry?,onHistory:()->Unit){
     val p=LocalEzPalette.current
-    Box(Modifier.fillMaxWidth().heightIn(min=230.dp).clip(RoundedCornerShape(28.dp)).background(p.lavender)){
-        Image(painterResource(R.drawable.transfer_art),"هاتفان يتبادلان الصور والملفات لاسلكيًا",Modifier.align(Alignment.BottomEnd).offset(x=17.dp,y=6.dp).width(175.dp).height(205.dp),contentScale=ContentScale.Fit)
-        Column(Modifier.fillMaxWidth(.68f).padding(20.dp)){
+    BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min=230.dp).clip(RoundedCornerShape(28.dp)).background(p.lavender)){
+        val compact=maxWidth<336.dp
+        Image(painterResource(R.drawable.transfer_art),"هاتفان يتبادلان الصور والملفات لاسلكيًا",Modifier.align(Alignment.BottomEnd).offset(x=if(compact)20.dp else 17.dp,y=6.dp).width(if(compact)145.dp else 175.dp).height(205.dp).alpha(if(LocalDensity.current.fontScale>1.1f).15f else 1f),contentScale=ContentScale.Fit)
+        Column(Modifier.fillMaxWidth().padding(20.dp)){
             EzTag("بدون إنترنت",R.drawable.ic_wifi_high)
-            Text("ملفاتك توصل.\nبلمح البصر.",Modifier.padding(top=10.dp,bottom=4.dp),fontSize=28.sp,lineHeight=40.sp,fontWeight=FontWeight.ExtraBold,color=EzTokens.Ink,letterSpacing=(-1.2).sp,softWrap=LocalDensity.current.fontScale>1.1f,maxLines=if(LocalDensity.current.fontScale>1.1f)6 else 2)
+            Text("ملفاتك توصل.\nبلمح البصر.",Modifier.padding(top=10.dp,bottom=4.dp),fontSize=if(compact)25.sp else 28.sp,lineHeight=if(compact)36.sp else 40.sp,fontWeight=FontWeight.ExtraBold,color=EzTokens.Ink,letterSpacing=(-1.2).sp,softWrap=LocalDensity.current.fontScale>1.1f,maxLines=if(LocalDensity.current.fontScale>1.1f)6 else 2)
             Text("قرّب جهازك، وشارك اللي تحب.",fontSize=10.sp,lineHeight=16.sp,color=EzTokens.Ink,maxLines=1)
             EzButton("ابدأ المشاركة",{onFiles("الكل")},Modifier.padding(top=13.dp),icon=R.drawable.ic_arrow_up_left)
         }
