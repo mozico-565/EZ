@@ -35,7 +35,7 @@ fun uniqueFilename(name: String, exists: (String) -> Boolean): String {
 }
 data class Progress(val bytes: Long, val total: Long, val elapsedNanos: Long, val currentMBps: Double) {
     val averageMBps get() = if (elapsedNanos > 0) bytes / (elapsedNanos / 1e9) / 1e6 else 0.0
-    val percent get() = if (total > 0) (bytes.toDouble() / total * 100).coerceIn(0.0, 100.0) else null
+    val percent get() = if (total == 0L && bytes == 0L) 100.0 else if (total > 0) (bytes.toDouble() / total * 100).coerceIn(0.0, 100.0) else null
     val etaSeconds get() = if (total >= bytes && currentMBps > 0) (total - bytes) / (currentMBps * 1e6) else null
 }
 class ProgressMeter(private val total: Long, private val clock: () -> Long = System::nanoTime) {
@@ -138,7 +138,7 @@ object TransferEngine {
             }
         }
         requireProtocol(m.size<0||bytes==m.size,"Source truncated")
-        val hash=digest.digest();ch.send(packet(4){it.writeLong(bytes);it.write(hash)})
+        val hash=digest.digest();ch.send(packet(4){it.writeLong(bytes);it.write(hash)});c.approvalWindow()
         val ack=DataInputStream(ByteArrayInputStream(ch.receive()));requireProtocol(ack.readUnsignedByte()==5,"No verified receipt")
         requireProtocol(ack.readLong()==bytes,"Receipt length mismatch");val remoteHash=ByteArray(32);ack.readFully(remoteHash);requireProtocol(ack.available()==0 && MessageDigest.isEqual(remoteHash,hash),"Receipt hash mismatch")
         val progress=meter.sample(bytes);onProgress(progress);return Result(m,bytes,digestHex(hash),progress.elapsedNanos)
@@ -157,7 +157,7 @@ object TransferEngine {
                     }
                 }
             }
-            val saved=pending.commit();committed=true
+            c.approvalWindow();val saved=pending.commit();committed=true
             ch.send(packet(5){it.writeLong(bytes);it.write(hash)});val progress=meter.sample(bytes);onProgress(progress);return Result(m,bytes,digestHex(hash),progress.elapsedNanos,saved)
         } finally { if(!committed){runCatching { pending.output.close() };runCatching { pending.abort() }} }
     }
