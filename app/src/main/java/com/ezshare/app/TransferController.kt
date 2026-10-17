@@ -102,7 +102,7 @@ class TransferController(private val app:Application) {
     fun stopReceive(){val old=synchronized(this){wantsReceive=false;server.also{server=null}};runCatching{old?.close()};discovery.stopAdvertising();_ui.update{it.copy(listening=false,port=0)};if(!inUse.get())stopForeground()}
     private fun progress(p:Progress){_ui.update{it.copy(progress=p,status="جارٍ نقل الملف الفعلي…",stage="transfer")}}
     private fun finish(result:Result){_ui.update{it.copy(progress=it.progress?.copy(total=result.bytes,currentMBps=0.0),result=result,status="اكتمل النقل والتحقق من SHA-256",request=null,error=null,stage="result")}}
-    private fun fail(e:Exception){_ui.update{it.copy(error=when(e){is SocketTimeoutException->"انتهت مهلة الاتصال. قرّب الهاتفين وافحص الشبكة ثم أعد المحاولة.";is TimeoutCancellationException->"انتهت مهلة موافقة المستخدم.";else->"تعذّرت العملية: ${e.message?:e.javaClass.simpleName}. لم يُعلن نجاح أي ملف جزئي."},status="توقفت العملية",request=null)}}
+    private fun fail(e:Exception){if(cancellationRequested){_ui.update{it.copy(error="أُلغي النقل؛ لا يُعد الملف الجزئي ناجحًا.",status="تم الإلغاء",request=null)};return};_ui.update{it.copy(error=when(e){is SocketTimeoutException->"انتهت مهلة الاتصال. قرّب الهاتفين وافحص الشبكة ثم أعد المحاولة.";is TimeoutCancellationException->"انتهت مهلة موافقة المستخدم.";else->"تعذّرت العملية: ${e.message?:e.javaClass.simpleName}. لم يُعلن نجاح أي ملف جزئي."},status="توقفت العملية",request=null)}}
     private fun runForeground(){TransferService.start(app)}
     private fun stopForeground(){app.stopService(Intent(app,TransferService::class.java))}
     fun serviceStopped(){if(inUse.get()||server!=null)cancel()}

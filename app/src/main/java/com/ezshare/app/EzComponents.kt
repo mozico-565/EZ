@@ -98,13 +98,13 @@ val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.Catego
     Column(Modifier.weight(1f)){Text(r.name,fontSize=13.sp,fontWeight=FontWeight.SemiBold,lineHeight=22.sp);Text("${if(r.incoming)"استقبلت من" else "أرسلت إلى"} ${r.peer}",fontSize=10.sp,color=p.muted);Text(dateLabel(r.date),fontSize=10.sp,color=p.muted);Text("${humanSize(r.bytes)} · ${statusLabel(r.status)}",fontSize=10.sp,color=p.muted)};EzIcon(R.drawable.ic_arrow_up_left,size=18.dp)
 }}
 @Composable fun TransferContent(state:TransferUi,onCancel:()->Unit,onDetails:()->Unit,onRetry:()->Unit){
-    val p=LocalEzPalette.current;val pr=state.progress;val done=state.result!=null;val failed=state.error!=null;val pct=if(done)100f else pr?.percent?.toFloat()
+    val p=LocalEzPalette.current;val pr=state.progress;val done=state.result!=null;val failed=state.error!=null;val cancelled=state.status=="تم الإلغاء";val pct=if(done)100f else pr?.percent?.toFloat()
     val eased by animateFloatAsState(pct?:0f,if(LocalEzQuiet.current)snap() else tween(400,easing=LinearEasing),label="actual-progress")
     EzBadge("نقل فعلي · القيم من البايتات المنقولة")
     EzDevice(state.peer.ifBlank{"الجهاز الآخر"},if(state.incoming)"من" else "إلى",1)
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally){
-        Box(Modifier.padding(top=20.dp,bottom=20.dp).size(86.dp).clip(RoundedCornerShape(30.dp)).background(if(done)Color(0xffcfe9dd) else if(failed)EzTokens.Peach else EzTokens.CategoryPurple),contentAlignment=Alignment.Center){EzIcon(if(done)R.drawable.ic_check_circle else if(failed)R.drawable.ic_warning_circle else R.drawable.ic_broadcast,size=52.dp,tint=EzTokens.Ink)}
-        Text(if(done)"وصلت، بكل سهولة." else if(failed)"تعذّر إكمال النقل" else if(pr!=null)"جارٍ النقل" else "جارٍ الاتصال",fontSize=25.sp,lineHeight=38.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center)
+        Box(Modifier.padding(top=20.dp,bottom=20.dp).size(86.dp).clip(RoundedCornerShape(30.dp)).background(if(done)Color(0xffcfe9dd) else if(failed)EzTokens.Peach else EzTokens.CategoryPurple),contentAlignment=Alignment.Center){EzIcon(if(done)R.drawable.ic_check_circle else if(cancelled)R.drawable.ic_x else if(failed)R.drawable.ic_warning_circle else R.drawable.ic_broadcast,size=52.dp,tint=EzTokens.Ink)}
+        Text(if(done)"وصلت، بكل سهولة." else if(cancelled)"تم إلغاء النقل" else if(failed)"تعذّر إكمال النقل" else if(pr!=null)"جارٍ النقل" else "جارٍ الاتصال",fontSize=25.sp,lineHeight=38.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center)
         Text(if(pct!=null)"%.1f%%".format(Locale.US,eased) else "—",Modifier.padding(top=20.dp),fontSize=48.sp,lineHeight=72.sp,fontWeight=FontWeight.SemiBold)
         if(pr!=null&&pct!=null)CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){LinearProgressIndicator(progress={(eased/100).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth().padding(vertical=12.dp).height(10.dp).clip(RoundedCornerShape(20.dp)),color=EzTokens.Accent,trackColor=p.line,drawStopIndicator={})} else if(state.busy)LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical=12.dp),color=EzTokens.Accent)
         Text("${humanSize(pr?.bytes?:0)} من ${humanSize(pr?.total?:-1)}",fontSize=12.sp,color=p.muted)
