@@ -3,7 +3,7 @@
 Native Kotlin / Jetpack Compose Android application. Arabic RTL, Android 10+ (API29), compile/target35. **Alpha: awaiting two-physical-phone testing and independent security review.** No WebView, cloud transfer, account, or paid backend.
 
 ## Implemented
-Single real SAF-selected file → local TCP connection (NSD discovery + manual private IPv4:port fallback) → ephemeral P-256 ECDH and AES-256-GCM records → six-digit SAS comparison and explicit approval on both phones → 64KiB bounded streaming → receiver writes `.ezpart-*` → verifies SHA-256 and length → closes and renames document → sends verified receipt → sender reports success.
+Single real SAF-selected file → local TCP connection (NSD discovery + manual private IPv4:port fallback) → ephemeral P-256 ECDH and AES-256-GCM records → six-digit SAS comparison and explicit approval on both phones → 64KiB bounded streaming → receiver writes `.ezpart-*` → verifies stream SHA-256 and length → closes and re-reads saved bytes for SHA-256 verification → renames document → sends verified receipt → sender reports success.
 
 Progress and MB/s use real stream bytes and monotonic nanoseconds; speeds are not benchmarks. Known/unknown lengths, duplicate names, bounded metadata, 16GiB safety cap, timeouts, cancellation, errors and partial cleanup are implemented. Notification foreground service covers active transfers/receive mode. Long file streams are never loaded into RAM.
 
@@ -30,7 +30,7 @@ Debug output: `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs t
 - `core/src/test/`: real TCP loopback integration and unit/error tests.
 - `.github/workflows/android.yml`: build, reports and debug artifact.
 
-Initial browser bootstrap may place source in `EZ-Alpha-Source.zip`; CI validates/builds it and a narrowly scoped job expands the tested source into normal files on the `alpha/*` branch after success. No force push or settings changes. Subsequent builds use normal source files; the archive is only an initial checkpoint. Default workflow permissions are read-only; only the one-time source materialization job writes to this development branch.
+`EZ-Alpha-Source.zip` in the repository is a historical bootstrap checkpoint, not the current source. CI expanded the tested source into the normal directories. Current canonical source is `app/`, `core/` and the Gradle files. The one-time write-permission materialization job has been removed; ordinary CI now has read-only repository permissions. Fresh branch builds cancel superseded runs and cache Gradle dependencies.
 
 ## Limitations / do not overclaim
 - No two-phone validation yet; loopback tests are not a device-network benchmark.
