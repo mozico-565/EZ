@@ -120,7 +120,7 @@ val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.Catego
     if(!state.busy&&pr==null&&!done&&!failed)EzEmpty("أول مشاركة تبدأ منك","ابدأ إرسالًا أو استقبالًا لعرض تقدم حقيقي هنا.")
     Text("الإيقاف المؤقت والاستئناف قريبًا. لا تُعرض قياسات سرعة وهمية.",Modifier.fillMaxWidth().padding(top=20.dp),textAlign=TextAlign.Center,fontSize=9.sp,color=p.muted)
 }
-@Composable private fun Metric(value:String,label:String,modifier:Modifier=Modifier){Column(modifier,horizontalAlignment=Alignment.CenterHorizontally){Text(value,fontSize=12.sp,fontWeight=FontWeight.SemiBold);Text(label,Modifier.padding(top=5.dp),fontSize=9.sp,color=LocalEzPalette.current.muted)}}
+@Composable private fun Metric(value:String,label:String,modifier:Modifier=Modifier){Column(modifier,horizontalAlignment=Alignment.CenterHorizontally){Text(value,fontSize=12.sp,fontWeight=FontWeight.SemiBold,style=LocalTextStyle.current.copy(textDirection=androidx.compose.ui.text.style.TextDirection.Ltr,textAlign=TextAlign.Center));Text(label,Modifier.padding(top=5.dp),fontSize=9.sp,color=LocalEzPalette.current.muted)}}
 fun fileCategory(mime:String,name:String)=when{mime.startsWith("image/")->"الصور";mime.startsWith("video/")->"الفيديوهات";name.endsWith(".apk",true)->"التطبيقات";mime.startsWith("text/")||mime=="application/pdf"||name.endsWith(".docx",true)->"المستندات";else->"ملفات أخرى"}
 fun fileIcon(category:String)=categories.find{it.label==category}?.icon?:R.drawable.ic_file_text
 fun statusLabel(status:String)=when(status){"completed"->"مكتمل";"cancelled"->"تم الإلغاء";else->"تعذّر إكمال النقل"}

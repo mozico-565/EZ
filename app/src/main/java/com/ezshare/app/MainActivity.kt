@@ -55,4 +55,4 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
         onPick={picker.launch(arrayOf("*/*"))},onFolder={folders.launch(null)},onDiscover=controller::startDiscovery,
         onSend={notifyPermission();controller.send(it)},onReceive={notifyPermission();controller.receive()},onCancel=controller::cancel,onDecide=controller::decide,onSave=vm::save,onClearHistory=vm::clearHistory)}
 }
-fun humanSize(bytes:Long):String=when{bytes<0->"غير معروف";bytes>=1_000_000_000->"%.2f GB".format(java.util.Locale.US,bytes/1e9);bytes>=1_000_000->"%.1f MB".format(java.util.Locale.US,bytes/1e6);bytes>=1000->"%.0f KB".format(java.util.Locale.US,bytes/1e3);else->"$bytes B"}
+fun humanSize(bytes:Long):String { val text=when{bytes<0->"غير معروف";bytes>=1_000_000_000->"%.2f GB".format(java.util.Locale.US,bytes/1e9);bytes>=1_000_000->"%.1f MB".format(java.util.Locale.US,bytes/1e6);bytes>=1000->"%.0f KB".format(java.util.Locale.US,bytes/1e3);else->"$bytes B"};return if(bytes<0)text else "\u2066$text\u2069"}
