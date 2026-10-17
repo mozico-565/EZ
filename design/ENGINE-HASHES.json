@@ -1,0 +1,5 @@
+{
+  "core/build.gradle.kts": "9b76d20392ffb23bce7e3a72eae25da1c6bd2a5bad8dcffccf36b2e86d68d7a3",
+  "core/src/test/kotlin/com/ezshare/core/EngineTest.kt": "5bb0f02b33c9a962c7431ac2d23a6562957c54c2563f532a1d821d4bf3798db5",
+  "core/src/main/kotlin/com/ezshare/core/Protocol.kt": "c4a2f9571900e966f2f7d37f890df78c67da9b3c257e17bd78c1c832f7d307cd"
+}
