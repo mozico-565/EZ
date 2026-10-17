@@ -8,8 +8,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.ui.unit.LayoutDirection
 import com.ezshare.core.Metadata
 import com.ezshare.core.Progress
@@ -27,15 +33,17 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk=[35],qualifiers="ar-rSA-w412dp-h892dp-xxhdpi")
 class DesignCaptureTest{
-    @get:Rule val compose=createComposeRule()
-    private fun render(screen:String="home",dark:Boolean=false,state:TransferUi=TransferUi(),sheet:String=""){
-        compose.setContent{EzTheme(dark=dark,quiet=true){EzApp(state,EzPreferences(name="جهازي · EZ"),emptyList(),emptyList(),initialDestination=screen,initialSheet=sheet)}}
+    @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
+    private fun render(screen:String="home",dark:Boolean=false,state:TransferUi=TransferUi(),sheet:String="",fontScale:Float=1f){
+        compose.activity.enableEdgeToEdge()
+        compose.setContent{CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density,fontScale)){EzTheme(dark=dark,quiet=true){EzApp(state,EzPreferences(name="جهازي · EZ"),emptyList(),emptyList(),initialDestination=screen,initialSheet=sheet)}}}
         compose.waitForIdle()
     }
     private fun shot(name:String){compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")}
-    @Test fun home(){render();compose.onNodeWithText("نشارك؟").assertIsDisplayed();shot("home-light-412")}
+    @Test fun home(){render();compose.onNodeWithText("نشارك؟").assertIsDisplayed();val layouts=mutableListOf<TextLayoutResult>();compose.onNodeWithText("ملفاتك توصل.\nبلمح البصر.").performSemanticsAction(SemanticsActions.GetTextLayoutResult){it(layouts)};assertEquals(2,layouts.single().lineCount);assertFalse(layouts.single().didOverflowWidth);shot("home-light-412")}
     @Test fun homeDark(){render(dark=true);shot("home-dark-412")}
     @Test @Config(qualifiers="ar-rSA-w360dp-h800dp-xhdpi") fun compactHome(){render();shot("home-light-360");compose.onNodeWithText("استقبال").assertIsDisplayed()}
+    @Test fun largeFontHome(){render(fontScale=1.5f);shot("home-font150-412")}
     @Test fun files(){render("files");shot("files-empty-412")}
     @Test fun selectedLongFilename(){render("files",state=TransferUi(picked=PickedFile(Uri.parse("content://capture/test"),Metadata("غروب الشمس على شاطئ البحر — النسخة الأصلية عالية الدقة.jpg","image/jpeg",6_400_000_000))));shot("files-selected-long-name-412")}
     @Test fun receive(){render("receive");shot("receive-412")}
@@ -50,5 +58,5 @@ class DesignCaptureTest{
     @Test fun shareSheet(){render(sheet="share");shot("share-sheet-412")}
     @Test fun navigationAndSearchWork(){render();compose.onNodeWithContentDescription("الملفات").performClick();compose.waitForIdle();compose.onNodeWithText("أشياء تستحق\nالمشاركة.").assertExists();compose.onNode(hasSetTextAction()).performTextInput("لا يوجد");compose.onNodeWithText("لا توجد نتائج").assertExists();compose.onNodeWithContentDescription("مسح البحث").performClick();compose.onNodeWithContentDescription("السجل").performClick();compose.onNodeWithText("أول مشاركة تبدأ منك").assertExists()}
     @Test fun iconUsesApprovedAspect(){val c=org.robolectric.RuntimeEnvironment.getApplication();val d=c.resources.getDrawable(R.drawable.launcher_foreground,c.theme);assertEquals(d.intrinsicWidth,d.intrinsicHeight);assertEquals("EZ",c.applicationInfo.loadLabel(c.packageManager).toString())}
-    @Test fun beforeAlphaHome(){compose.setContent{MaterialTheme(colorScheme=lightColorScheme(primary=Color(0xff2385e8),background=Color.White,surface=Color.White,onSurface=Color(0xff111111))){CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl){LegacyAlphaScreen()}}};compose.waitForIdle();shot("before-alpha-home-412")}
+    @Test fun beforeAlphaHome(){compose.activity.enableEdgeToEdge();compose.setContent{MaterialTheme(colorScheme=lightColorScheme(primary=Color(0xff2385e8),background=Color.White,surface=Color.White,onSurface=Color(0xff111111))){CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl){LegacyAlphaScreen()}}};compose.waitForIdle();shot("before-alpha-home-412")}
 }
