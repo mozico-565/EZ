@@ -36,7 +36,7 @@ data class EzPalette(val background:Color=Color.White,val surface:Color=Color.Wh
 val LocalEzPalette=staticCompositionLocalOf{EzPalette()}
 val LocalEzQuiet=staticCompositionLocalOf{false}
 private val Arabic=FontFamily(Font(R.font.noto_regular,FontWeight.Normal),Font(R.font.noto_medium,FontWeight.Medium),Font(R.font.noto_semibold,FontWeight.SemiBold),Font(R.font.noto_bold,FontWeight.Bold),Font(R.font.noto_extrabold,FontWeight.ExtraBold))
-@Composable fun EzTheme(dark:Boolean=false,quiet:Boolean=false,content:@Composable()->Unit){
+@Composable fun EzTheme(dark:Boolean=false,quiet:Boolean=false,content: @Composable () -> Unit){
     val p=if(dark)EzPalette(Color(0xff191c22),Color(0xff20232a),Color(0xff292d35),Color(0xfff2f2f5),Color(0xffb6bac5),Color(0xff3c414d),true) else EzPalette()
     val style=TextStyle(fontFamily=Arabic,fontSize=14.sp,lineHeight=22.sp,platformStyle=PlatformTextStyle(includeFontPadding=false))
     CompositionLocalProvider(LocalEzPalette provides p,LocalEzQuiet provides quiet,LocalLayoutDirection provides LayoutDirection.Rtl){
