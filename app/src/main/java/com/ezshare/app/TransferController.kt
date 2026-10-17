@@ -25,7 +25,7 @@ data class TransferUi(
     val stage:String="home", val status:String="جاهز · Alpha 0.1", val picked:PickedFile?=null,
     val filename:String="", val folder:Uri?=null,val request:PairRequest?=null,val progress:Progress?=null,
     val result:Result?=null,val error:String?=null,val listening:Boolean=false,val port:Int=0,
-    val peers:List<Peer> = emptyList(),val discoveryMessage:String="", val busy:Boolean=false
+    val incoming:Boolean=false,val peer:String="",val peers:List<Peer> = emptyList(),val discoveryMessage:String="", val busy:Boolean=false
 )
 class TransferController(private val app:Application) {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
@@ -39,7 +39,7 @@ class TransferController(private val app:Application) {
     @Volatile private var approval:CompletableDeferred<Boolean>?=null
     @Volatile private var activeStream:Closeable?=null
     private val discovery=Discovery(app,{ peers->_ui.update { it.copy(peers=peers) } },{ message->_ui.update { it.copy(discoveryMessage=message) } })
-    val identity:String get()=Build.MODEL.take(48)
+    val identity:String get()=EzLocalStore(app).read().name.ifBlank{Build.MODEL}.take(48)
     fun status(s:String){_ui.update{it.copy(status=s)}}
     fun page(s:String){_ui.update{it.copy(stage=s)}}
     fun pick(uri:Uri){try{
@@ -61,7 +61,7 @@ class TransferController(private val app:Application) {
     fun decide(accepted:Boolean){approval?.complete(accepted)}
     private fun ask(peer:String,sas:String,m:Metadata?,incoming:Boolean):Boolean=runBlocking {
         val decision=CompletableDeferred<Boolean>();approval=decision
-        _ui.update{it.copy(filename=m?.name?:it.picked?.metadata?.name.orEmpty(),request=PairRequest(peer,sas,m,incoming),status="قارن الرمز على الهاتفين ثم وافق",stage=if(incoming)"receive" else "send")}
+        _ui.update{it.copy(filename=m?.name?:it.picked?.metadata?.name.orEmpty(),request=PairRequest(peer,sas,m,incoming),peer=peer,incoming=incoming,status="قارن الرمز على الهاتفين ثم وافق",stage=if(incoming)"receive" else "send")}
         try {withTimeout(115_000){decision.await()}}finally{approval=null;_ui.update{it.copy(request=null)}}
     }
     fun receive(){if(_ui.value.folder==null){status("اختر مجلد الحفظ أولًا داخل المستندات");return}
@@ -73,7 +73,7 @@ class TransferController(private val app:Application) {
             _ui.update{it.copy(listening=true,port=listener.localPort,status="بانتظار طلب · قارن الرمز قبل القبول",error=null,stage="receive",result=null)}
             while(!listener.isClosed){val socket=listener.accept();if(!inUse.compareAndSet(false,true)){socket.close();continue}
                 scope.launch { val c=Connection(socket);connection=c
-                    try{if(cancellationRequested)throw IOException("Cancelled");_ui.update{it.copy(busy=true,progress=null,result=null,error=null)}
+                    try{if(cancellationRequested)throw IOException("Cancelled");_ui.update{it.copy(busy=true,progress=null,result=null,error=null,incoming=true,peer="")}
                         val result=TransferEngine.receive(c,identity,{m,peer,sas->ask(peer,sas,m,true)},{m->SafPending(app,_ui.value.folder?:throw IOException("اختر مجلدًا"),m){activeStream=it}},::progress)
                         finish(result)
                     }catch(e:Exception){fail(e)}finally{activeStream=null;c.close();connection=null;inUse.set(false);_ui.update{it.copy(busy=false)}}
@@ -86,7 +86,7 @@ class TransferController(private val app:Application) {
         if(!inUse.compareAndSet(false,true))return
         cancellationRequested=false
         runForeground()
-        _ui.update{it.copy(busy=true,error=null,result=null,progress=null,status="جارٍ الاتصال…")}
+        _ui.update{it.copy(busy=true,error=null,result=null,progress=null,incoming=false,peer=address,filename=file.metadata.name,status="جارٍ الاتصال…")}
         scope.launch {try{
             val (host,port)=parseLocalAddress(address)
             val socket=Socket();val c=Connection(socket);connection=c
@@ -100,7 +100,7 @@ class TransferController(private val app:Application) {
     }
     fun cancel(){cancellationRequested=true;approval?.complete(false);runCatching{activeStream?.close()};connection?.close();stopReceive();_ui.update{it.copy(status="تم الإلغاء",error=if(it.busy)"أُلغي النقل؛ لا يُعد الملف الجزئي ناجحًا." else null,request=null)} }
     fun stopReceive(){val old=synchronized(this){wantsReceive=false;server.also{server=null}};runCatching{old?.close()};discovery.stopAdvertising();_ui.update{it.copy(listening=false,port=0)};if(!inUse.get())stopForeground()}
-    private fun progress(p:Progress){_ui.update{it.copy(progress=p,status="جارٍ نقل الملف الفعلي…")}}
+    private fun progress(p:Progress){_ui.update{it.copy(progress=p,status="جارٍ نقل الملف الفعلي…",stage="transfer")}}
     private fun finish(result:Result){_ui.update{it.copy(progress=it.progress?.copy(total=result.bytes,currentMBps=0.0),result=result,status="اكتمل النقل والتحقق من SHA-256",request=null,error=null,stage="result")}}
     private fun fail(e:Exception){_ui.update{it.copy(error=when(e){is SocketTimeoutException->"انتهت مهلة الاتصال. قرّب الهاتفين وافحص الشبكة ثم أعد المحاولة.";is TimeoutCancellationException->"انتهت مهلة موافقة المستخدم.";else->"تعذّرت العملية: ${e.message?:e.javaClass.simpleName}. لم يُعلن نجاح أي ملف جزئي."},status="توقفت العملية",request=null)}}
     private fun runForeground(){TransferService.start(app)}
