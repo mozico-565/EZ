@@ -55,7 +55,7 @@ import java.util.Locale
     val density=LocalDensity.current;val top=with(density){WindowInsets.safeDrawing.getTop(this).toDp()};val bottom=WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
     Box(Modifier.fillMaxSize().background(p.background).testTag("ez-screen")){
         Column(Modifier.fillMaxSize().padding(top=maxOf(64.dp,top+8.dp))){
-            Row(Modifier.fillMaxWidth().padding(horizontal=24.dp).height(60.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            Row(Modifier.fillMaxWidth().padding(horizontal=24.dp).height(60.dp*LocalDensity.current.fontScale.coerceAtLeast(1f)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 Image(painterResource(R.drawable.ez_logo),"شعار EZ",Modifier.width(52.dp).height(28.dp).clip(RoundedCornerShape(5.dp)).background(Color.White),contentScale=ContentScale.Fit)
                 Column(Modifier.weight(1f)){Text("قريبين، حتى بدون إنترنت",fontSize=9.sp,color=p.muted,lineHeight=16.sp,maxLines=1);Text(pageTitle,fontSize=12.sp,fontWeight=FontWeight.SemiBold,lineHeight=20.sp,maxLines=2)}
                 if(screen=="home")EzRound(R.drawable.ic_share_network,"مشاركة تطبيق EZ",{sheet="share"},true)

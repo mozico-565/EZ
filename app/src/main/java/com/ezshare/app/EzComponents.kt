@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,14 +32,14 @@ val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.Catego
         Image(painterResource(R.drawable.transfer_art),"هاتفان يتبادلان الصور والملفات لاسلكيًا",Modifier.align(Alignment.BottomEnd).offset(x=17.dp,y=6.dp).width(175.dp).height(205.dp),contentScale=ContentScale.Fit)
         Column(Modifier.fillMaxWidth(.68f).padding(20.dp)){
             EzTag("بدون إنترنت",R.drawable.ic_wifi_high)
-            Text("ملفاتك توصل.\nبلمح البصر.",Modifier.padding(top=10.dp,bottom=4.dp),fontSize=28.sp,lineHeight=40.sp,fontWeight=FontWeight.ExtraBold,color=EzTokens.Ink,letterSpacing=(-1.2).sp)
+            Text("ملفاتك توصل.\nبلمح البصر.",Modifier.padding(top=10.dp,bottom=4.dp),fontSize=28.sp,lineHeight=40.sp,fontWeight=FontWeight.ExtraBold,color=EzTokens.Ink,letterSpacing=(-1.2).sp,softWrap=LocalDensity.current.fontScale>1.1f,maxLines=if(LocalDensity.current.fontScale>1.1f)6 else 2)
             Text("قرّب جهازك، وشارك اللي تحب.",fontSize=10.sp,lineHeight=16.sp,color=EzTokens.Ink,maxLines=1)
             EzButton("ابدأ المشاركة",{onFiles("الكل")},Modifier.padding(top=13.dp),icon=R.drawable.ic_arrow_up_left)
         }
     }
-    EzSection("نشارك؟")
+    EzSection("نشارك؟",caption="خطوة واحدة وتبدأ")
     // Keep the original asymmetry: 1.08 orange, .92 blue/pink; RTL places Send at the right.
-    Row(Modifier.fillMaxWidth().height(223.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+    Row(Modifier.fillMaxWidth().height(223.dp*LocalDensity.current.fontScale.coerceAtLeast(1f)),horizontalArrangement=Arrangement.spacedBy(10.dp)){
         Box(Modifier.weight(1.08f).fillMaxHeight().clip(RoundedCornerShape(26.dp)).background(p.orange).ezPress({onFiles("الكل")})){
             Column(Modifier.fillMaxSize().padding(16.dp)){
                 EzTag("من جهازك")
@@ -53,7 +54,7 @@ val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.Catego
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){EzTag("إلى جهازك");EzIcon(R.drawable.ic_arrow_down_right,size=32.dp,tint=EzTokens.Ink)}
                 Spacer(Modifier.weight(1f));Text("استقبال",fontSize=27.sp,lineHeight=38.sp,fontWeight=FontWeight.SemiBold,color=EzTokens.Ink);Text("جاهز لشيء جديد؟",fontSize=10.sp,color=EzTokens.Ink,lineHeight=16.sp)
             }
-            Row(Modifier.fillMaxWidth().height(68.dp).clip(RoundedCornerShape(24.dp)).background(p.pink).ezPress(onPrivacy).padding(horizontal=8.dp,vertical=12.dp),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){EzIcon(R.drawable.ic_shield_check,size=24.dp,tint=EzTokens.Ink);Spacer(Modifier.width(10.dp));Text("بينك وبينه.\nبخصوصية تامة.",fontSize=10.sp,lineHeight=16.sp,color=EzTokens.Ink)}
+            Row(Modifier.fillMaxWidth().height(68.dp*LocalDensity.current.fontScale.coerceAtLeast(1f)).clip(RoundedCornerShape(24.dp)).background(p.pink).ezPress(onPrivacy).padding(horizontal=8.dp,vertical=12.dp),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){EzIcon(R.drawable.ic_shield_check,size=24.dp,tint=EzTokens.Ink);Spacer(Modifier.width(10.dp));Text("بينك وبينه.\nبخصوصية تامة.",fontSize=10.sp,lineHeight=16.sp,color=EzTokens.Ink)}
         }
     }
     EzSection("كل ملفاتك","عرض الكل",{onFiles("الكل")})
@@ -72,7 +73,7 @@ val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.Catego
         val item=64.dp;val step=(maxWidth-item)/3;val target=step*active
         val offset by animateDpAsState(target,if(quiet)snap() else spring(dampingRatio=EzTokens.SpringDamping,stiffness=EzTokens.SpringStiffness),label="nav-indicator")
         Box(Modifier.offset(x=offset).width(item).fillMaxHeight().clip(RoundedCornerShape(50)).background(Color.White))
-        Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.SpaceBetween){labels.forEachIndexed{i,label->Column(Modifier.width(item).fillMaxHeight().ezPress({onTab(i)}),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){EzIcon(icons[i],label,24.dp,if(active==i)EzTokens.Ink else Color(0xffbcbcc4));Text(label,fontSize=8.sp,lineHeight=13.sp,color=if(active==i)EzTokens.Ink else Color(0xffbcbcc4))}}}
+        Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.SpaceBetween){labels.forEachIndexed{i,label->Column(Modifier.width(item).fillMaxHeight().ezPress({onTab(i)}),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){EzIcon(icons[i],label,24.dp,if(active==i)EzTokens.Ink else Color(0xffbcbcc4));Text(label,fontSize=8.sp,lineHeight=13.sp,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,color=if(active==i)EzTokens.Ink else Color(0xffbcbcc4))}}}
     }
 }
 @Composable fun FilterChip(label:String,selected:Boolean,onClick:()->Unit){val p=LocalEzPalette.current;Box(Modifier.clip(RoundedCornerShape(30.dp)).background(if(selected)EzTokens.Ink else p.soft).ezPress(onClick).heightIn(min=44.dp).padding(horizontal=12.dp,vertical=10.dp),contentAlignment=Alignment.Center){Text(label,fontSize=11.sp,color=if(selected)Color.White else p.ink)}}
@@ -109,7 +110,7 @@ val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.Catego
         if(pr!=null&&pct!=null)CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr){LinearProgressIndicator(progress={(eased/100).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth().padding(vertical=12.dp).height(10.dp).clip(RoundedCornerShape(20.dp)),color=EzTokens.Accent,trackColor=p.line,drawStopIndicator={})} else if(state.busy)LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical=12.dp),color=EzTokens.Accent)
         Text("${humanSize(pr?.bytes?:0)} من ${humanSize(pr?.total?:-1)}",fontSize=12.sp,color=p.muted)
         Text("${pr?.bytes?:0} / ${if((pr?.total?:-1)<0)"غير معروف" else pr?.total} بايت",Modifier.padding(top=8.dp),fontSize=10.sp,color=p.muted)
-        Row(Modifier.fillMaxWidth().padding(vertical=20.dp).clip(RoundedCornerShape(22.dp)).background(p.soft).padding(vertical=15.dp,horizontal=4.dp),horizontalArrangement=Arrangement.SpaceEvenly){Metric("${if(done)1 else 0} / 1","ملفات مكتملة");Metric(if(pr!=null)"%.2f MB/s".format(Locale.US,pr.currentMBps) else "—","السرعة الحالية");Metric(if(done)"0 ث" else pr?.etaSeconds?.let{"%.0f ث".format(Locale.US,it)}?:"—","الوقت المتبقي")}
+        Row(Modifier.fillMaxWidth().padding(vertical=20.dp).clip(RoundedCornerShape(22.dp)).background(p.soft).padding(vertical=15.dp,horizontal=4.dp),horizontalArrangement=Arrangement.SpaceEvenly){Metric("${if(done)1 else 0} / 1","ملفات مكتملة",Modifier.weight(1f));Metric(if(pr!=null)"%.2f MB/s".format(Locale.US,pr.currentMBps) else "—","السرعة الحالية",Modifier.weight(1f));Metric(if(done)"0 ث" else pr?.etaSeconds?.let{"%.0f ث".format(Locale.US,it)}?:"—","الوقت المتبقي",Modifier.weight(1f))}
     }
     if(state.filename.isNotBlank()){Text("الملف الحالي: ${state.filename}",Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).border(1.dp,p.line,RoundedCornerShape(17.dp)).padding(10.dp),fontSize=11.sp)}
     pr?.let{Text("المتوسط الفعلي: %.2f MB/s".format(Locale.US,it.averageMBps),Modifier.padding(top=12.dp),fontSize=12.sp,color=p.muted)}
@@ -119,7 +120,7 @@ val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.Catego
     if(!state.busy&&pr==null&&!done&&!failed)EzEmpty("أول مشاركة تبدأ منك","ابدأ إرسالًا أو استقبالًا لعرض تقدم حقيقي هنا.")
     Text("الإيقاف المؤقت والاستئناف قريبًا. لا تُعرض قياسات سرعة وهمية.",Modifier.fillMaxWidth().padding(top=20.dp),textAlign=TextAlign.Center,fontSize=9.sp,color=p.muted)
 }
-@Composable private fun Metric(value:String,label:String){Column(horizontalAlignment=Alignment.CenterHorizontally){Text(value,fontSize=12.sp,fontWeight=FontWeight.SemiBold);Text(label,Modifier.padding(top=5.dp),fontSize=9.sp,color=LocalEzPalette.current.muted)}}
+@Composable private fun Metric(value:String,label:String,modifier:Modifier=Modifier){Column(modifier,horizontalAlignment=Alignment.CenterHorizontally){Text(value,fontSize=12.sp,fontWeight=FontWeight.SemiBold);Text(label,Modifier.padding(top=5.dp),fontSize=9.sp,color=LocalEzPalette.current.muted)}}
 fun fileCategory(mime:String,name:String)=when{mime.startsWith("image/")->"الصور";mime.startsWith("video/")->"الفيديوهات";name.endsWith(".apk",true)->"التطبيقات";mime.startsWith("text/")||mime=="application/pdf"||name.endsWith(".docx",true)->"المستندات";else->"ملفات أخرى"}
 fun fileIcon(category:String)=categories.find{it.label==category}?.icon?:R.drawable.ic_file_text
 fun statusLabel(status:String)=when(status){"completed"->"مكتمل";"cancelled"->"تم الإلغاء";else->"تعذّر إكمال النقل"}
