@@ -1,0 +1,9 @@
+# Alpha protocol and threat boundaries
+
+Fresh ephemeral P-256 keys + random32-byte nonces per connection. Length-prefixed protocol version, roles, public keys, nonces and bounded display names form role-ordered transcript. ECDH secret, transcript SHA-256 salt and HMAC-SHA256 extraction/expansion derive independent directional AES256 keys and six-digit SAS. Each AES-GCM record has monotonic64-bit sequence in a12-byte nonce, fixed protocol/sequence AAD,16-byte authentication tag, bounded ciphertext length. Keys never reused across connections. No file content is sent before local sender confirmation AND remote receiver approval. Users MUST compare SAS on both phones. Names/IPs alone are untrusted.
+
+SAS is an Alpha manual verification mechanism, not account authentication or audited security. A six-digit code has limited entropy and requires user attention; no silent trust, persistent trust or automatic approval. One receiver connection at a time, metadata bounds, 16GiB cap and30-second inactivity timeout reduce resource exposure; approval allows120seconds. Metadata itself is visible to the selected encrypted peer before final approval. Authentication of the peer depends on the manual comparison.
+
+SHA-256 verifies full received stream against sender's terminal hash and announced length. Receiver closes output, renames partial document, then returns count+hash receipt; sender only marks success on that receipt. Integrity failure calls best-effort abort/delete, no success. SHA does not replace pairing or encryption. No release security claim; independent protocol review, fuzzing, malformed EC keys, downgrade/replay testing, DoS analysis and physical devices remain required.
+
+Report any SAS mismatch, unexpected acceptance, data corruption, unwanted overwrite or leaked plaintext. Do not use for sensitive production files until reviewed and device tested.
