@@ -19,3 +19,18 @@ Record both models, Android versions, APK run/commit, Wi-Fi band/router or hotsp
 - [ ] AP isolation/VPN/no peers: manual fallback and errors are clear.
 
 Return: model/version for each, Actions run + APK commit, sizes, elapsed seconds, averageMB/s, SHA matches, observed errors/screenshots, whether files open and any leftover `.ezpart-*`. A successful CI build does not prove any of these physical tests passed.
+
+# Design correction 0.1.1 checks
+
+- [ ] Launcher on circle/squircle masks: entire blue E and black Z visible, same aspect, no stretching. Check normal and themed monochrome icon, light/dark wallpaper, cold-start splash and label EZ.
+- [ ] Compare native Home with supplied HTML at same device width: 24dp margins, purple hero/source art, orange right Send, blue left Receive/pink privacy stack, four category cards, black capsule with white active indicator.
+- [ ] Small 360dp screen, display/font scale 1.0/1.3/2.0: scroll content; long Arabic filename wraps without horizontal clipping; controls remain reachable above keyboard/system bars.
+- [ ] Tap Home/Files/History/Settings rapidly and Android Back; switch light/dark/system, reduce motion and restore settings; changes persist after restart.
+- [ ] Real SAF file selection, checkbox, search no-results/clear, category filters, selected count/size, send CTA and manual IP are functional. Alpha deliberately selects one file only.
+- [ ] Receive folder picker denial/cancel, active listening addresses, incoming SAS confirmation, rejection, accept and cancel remain truthful. No QR camera permission or simulated peer list.
+- [ ] Real progress/result/error metrics and actual history/detail; clear history confirmation deletes metadata only.
+- [ ] Settings identity updates both local preview and the name announced to the next peer; changes disabled during active listen/transfer.
+- [ ] Share sheet and QR destination explicitly say coming soon and do not claim link/APK/scanning support.
+- [ ] Repeat the full two-phone transfer checklist above after the UI correction. The CI core loopback test cannot establish OEM foreground-service or physical network behavior.
+
+Generated native captures use Robolectric API35 and must not be labelled physical-device screenshots. Test transfer fixtures are restricted to test/ source and are never bundled as runtime file lists or measurements.
