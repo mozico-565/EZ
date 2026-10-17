@@ -12,6 +12,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*
 import java.net.*
+import java.security.MessageDigest
+import java.security.DigestOutputStream
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -99,7 +101,7 @@ class TransferController(private val app:Application) {
     fun cancel(){cancellationRequested=true;approval?.complete(false);runCatching{activeStream?.close()};connection?.close();stopReceive();_ui.update{it.copy(status="تم الإلغاء",error=if(it.busy)"أُلغي النقل؛ لا يُعد الملف الجزئي ناجحًا." else null,request=null)} }
     fun stopReceive(){val old=synchronized(this){wantsReceive=false;server.also{server=null}};runCatching{old?.close()};discovery.stopAdvertising();_ui.update{it.copy(listening=false,port=0)};if(!inUse.get())stopForeground()}
     private fun progress(p:Progress){_ui.update{it.copy(progress=p,status="جارٍ نقل الملف الفعلي…")}}
-    private fun finish(result:Result){_ui.update{it.copy(result=result,status="اكتمل النقل والتحقق من SHA-256",request=null,error=null,stage="result")}}
+    private fun finish(result:Result){_ui.update{it.copy(progress=it.progress?.copy(total=result.bytes,currentMBps=0.0),result=result,status="اكتمل النقل والتحقق من SHA-256",request=null,error=null,stage="result")}}
     private fun fail(e:Exception){_ui.update{it.copy(error=when(e){is SocketTimeoutException->"انتهت مهلة الاتصال. قرّب الهاتفين وافحص الشبكة ثم أعد المحاولة.";is TimeoutCancellationException->"انتهت مهلة موافقة المستخدم.";else->"تعذّرت العملية: ${e.message?:e.javaClass.simpleName}. لم يُعلن نجاح أي ملف جزئي."},status="توقفت العملية",request=null)}}
     private fun runForeground(){TransferService.start(app)}
     private fun stopForeground(){app.stopService(Intent(app,TransferService::class.java))}
@@ -111,21 +113,26 @@ fun parseLocalAddress(value:String):Pair<InetAddress,Int>{val parts=value.trim()
     require(parts[0].split('.').all{it.toInt() in 0..255}){"عنوان غير صالح"}
     val host=InetAddress.getByName(parts[0]);require(host.isSiteLocalAddress||host.isLinkLocalAddress){"استخدم عنوان الهاتف على الشبكة المحلية"};val port=parts[1].toIntOrNull()?:0;require(port in 1024..65535){"منفذ غير صالح"};return host to port
 }
-class SafPending(private val app:Application,tree:Uri,m:Metadata,onOpen:(Closeable)->Unit):PendingFile {
+class SafPending(private val app:Application,tree:Uri,m:Metadata,private val onOpen:(Closeable)->Unit):PendingFile {
     private val resolver=app.contentResolver
     private val parent=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree))
     private var uri:Uri
+    private val storageDigest=MessageDigest.getInstance("SHA-256")
     private val finalName=uniqueFilename(m.name){name->exists(tree,name)}
     override val output:OutputStream
     init {
         uri=DocumentsContract.createDocument(resolver,parent,m.mime,"${finalName}.ezpart-${UUID.randomUUID().toString().take(8)}")?:throw IOException("المجلد لا يدعم إنشاء الملفات")
-        try{output=resolver.openOutputStream(uri,"w")?:throw IOException("تعذّرت الكتابة");onOpen(output)}catch(e:Exception){runCatching{DocumentsContract.deleteDocument(resolver,uri)};throw e}
+        try{output=DigestOutputStream(resolver.openOutputStream(uri,"w")?:throw IOException("تعذّرت الكتابة"),storageDigest);onOpen(output)}catch(e:Exception){runCatching{DocumentsContract.deleteDocument(resolver,uri)};throw e}
     }
     private fun exists(tree:Uri,name:String):Boolean {
         val children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree))
         return resolver.query(children,arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),null,null,null)?.use { c->var found=false;while(c.moveToNext())if(c.getString(0)==name)found=true;found }?:throw IOException("تعذّر فحص أسماء الملفات")
     }
-    override fun commit():String {val renamed=DocumentsContract.renameDocument(resolver,uri,finalName)?:throw IOException("المجلد لا يدعم نشر الملف بعد التحقق؛ اختر مجلدًا محليًا آخر")
+    override fun commit():String {
+        val expected=storageDigest.digest();val actual=MessageDigest.getInstance("SHA-256")
+        (resolver.openInputStream(uri)?:throw IOException("تعذّر إعادة قراءة الملف للتحقق")).use{input->onOpen(input);val buffer=ByteArray(64*1024);while(true){val n=input.read(buffer);if(n<0)break;if(n>0)actual.update(buffer,0,n)}}
+        if(!MessageDigest.isEqual(expected,actual.digest()))throw IOException("فشل التحقق من الملف المحفوظ")
+        val renamed=DocumentsContract.renameDocument(resolver,uri,finalName)?:throw IOException("المجلد لا يدعم نشر الملف بعد التحقق؛ اختر مجلدًا محليًا آخر")
         uri=renamed;return renamed.toString()
     }
     override fun abort(){if(!DocumentsContract.deleteDocument(resolver,uri))throw IOException("تعذّر حذف الملف الجزئي")}

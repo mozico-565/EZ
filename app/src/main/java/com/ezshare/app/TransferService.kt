@@ -15,6 +15,7 @@ class TransferService:Service(){
     }
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {if(intent?.action=="cancel"){(application as EZApplication).transfers.cancel();stopSelf()};return START_NOT_STICKY}
     override fun onBind(intent:Intent?):IBinder?=null
+    override fun onDestroy(){(application as EZApplication).transfers.serviceStopped();super.onDestroy()}
     override fun onTimeout(startId:Int,fgsType:Int){(application as EZApplication).transfers.cancel();stopSelf()}
     companion object {fun start(context:Context){context.startForegroundService(Intent(context,TransferService::class.java))}}
 }
