@@ -26,8 +26,15 @@ jobs:
       - name: Preserve development signing identity for subsequent debug builds
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: ez-development-debug-key-v1
+          path: ~/.android/ez-development-debug.jks
+          key: ez-development-debug-key-v2
+      - name: Prepare explicit development signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/ez-development-debug.jks" ]; then
+            keytool -genkeypair -keystore "$HOME/.android/ez-development-debug.jks" -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=EZ Android Debug,O=Development,C=US'
+          fi
+          echo "EZ_DEBUG_KEYSTORE_PATH=$HOME/.android/ez-development-debug.jks" >> "$GITHUB_ENV"
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Test, render native UI, lint and build debug APK
