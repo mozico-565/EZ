@@ -40,7 +40,7 @@ class DesignCaptureTest{
         compose.waitForIdle()
     }
     private fun shot(name:String){compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")}
-    @Test fun home(){render();compose.onNodeWithText("نشارك؟").assertIsDisplayed();val layouts=mutableListOf<TextLayoutResult>();compose.onNodeWithText("ملفاتك توصل.\nبلمح البصر.").performSemanticsAction(SemanticsActions.GetTextLayoutResult){it(layouts)};assertEquals(2,layouts.single().lineCount);assertFalse(layouts.single().didOverflowWidth);shot("home-light-412")}
+    @Test fun home(){render();compose.onNodeWithText("نشارك؟").assertIsDisplayed();val layouts=mutableListOf<TextLayoutResult>();compose.onNodeWithText("ملفاتك توصل.\nبلمح البصر.").performSemanticsAction(SemanticsActions.GetTextLayoutResult){it(layouts)};assertEquals(2,layouts.single().lineCount);assertFalse("Hero measured ${layouts.single().size}; intrinsic width must fit the full RTL measure area",layouts.single().didOverflowWidth);shot("home-light-412")}
     @Test fun homeDark(){render(dark=true);shot("home-dark-412")}
     @Test @Config(qualifiers="ar-rSA-w360dp-h800dp-xhdpi") fun compactHome(){render();shot("home-light-360");compose.onNodeWithText("استقبال").assertIsDisplayed()}
     @Test fun largeFontHome(){render(fontScale=1.5f);shot("home-font150-412")}
