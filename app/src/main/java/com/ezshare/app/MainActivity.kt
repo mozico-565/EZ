@@ -30,10 +30,11 @@ class EZViewModel(app:Application):AndroidViewModel(app){
     private var lastResult:com.ezshare.core.Result?=null;private var lastError:String?=null
     fun save(p:EzPreferences){store.save(p);_preferences.value=p}
     fun observe(s:TransferUi){
+        if(s.error==null)lastError=null
         s.result?.let{r->if(r!==lastResult){lastResult=r;lastError=null;add(HistoryEntry(name=r.metadata.name,bytes=r.bytes,total=r.metadata.size,duration=r.elapsedNanos/1e9,sha=r.sha256,peer=s.peer,incoming=s.incoming,status="completed",savedAt=r.savedAt))}}
-        if(s.error!=null&&s.error!=lastError&&s.filename.isNotBlank()&&s.progress!=null){lastError=s.error;val p=s.progress;add(HistoryEntry(name=s.filename,bytes=p.bytes,total=p.total,duration=0.0,peer=s.peer,incoming=s.incoming,status=if(s.status=="تم الإلغاء")"cancelled" else "failed"))}
+        if(s.error!=null&&s.error!=lastError&&s.filename.isNotBlank()&&s.progress!=null){lastError=s.error;val p=s.progress;add(HistoryEntry(name=s.filename,bytes=p.bytes,total=p.total,duration=p.elapsedNanos/1e9,peer=s.peer,incoming=s.incoming,status=if(s.status=="تم الإلغاء")"cancelled" else "failed"))}
     }
-    private fun add(r:HistoryEntry){_history.value=listOf(r)+_history.value;store.saveHistory(_history.value)}
+    private fun add(r:HistoryEntry){_history.value=(listOf(r)+_history.value).take(100);store.saveHistory(_history.value)}
     fun clearHistory(){_history.value=emptyList();store.saveHistory(emptyList())}
 }
 class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);enableEdgeToEdge();setContent{EZScreen()}}}
