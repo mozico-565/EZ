@@ -40,10 +40,19 @@ Debug output: `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs t
 - Final receipt loss can cause sender failure although receiver has a verified saved file. Inspect receiver before retrying; duplicate names are not overwritten.
 - Cancellation/timeouts close sockets, but a hostile/broken document provider can block its own I/O. Android may kill the process; no resume/recovery. Background/foreground behavior needs testing across OEMs.
 - Active receive mode needs foreground-service lifetime and can reach system time limits; stop when not needed. Notification denial does not imply broad file permissions.
-- App state/history does not persist across process death. Destination access can be persisted by SAF, but this Alpha chooses it in the current session.
-- Wi-Fi Direct, QR, multi-file, pause/resume, detailed history, avatars/dark mode, app sharing are roadmap only. The earlier HTML design prototype is not the transfer engine.
+- Active transfer state does not persist across process death. Completed/failed session history and appearance preferences persist locally. Destination access can be persisted by SAF, but this Alpha chooses it in the current session.
+- Wi-Fi Direct, QR, multi-file, pause/resume and app sharing remain roadmap only. History, avatars and appearance preferences are implemented in the design correction. The earlier HTML design prototype is not the transfer engine.
 
 ## Troubleshooting
 No peers: manual IP/port and recheck same subnet, AP isolation, VPN, firewall. Timeout: compare/approve before120s and ensure receiver foreground. Unknown file size: percentage/ETA can be unknown until final count. No save: choose local subfolder, verify capacity, try another provider. Hash mismatch/incomplete connection: no successful result; retry as new transfer. No broad storage permission or MANAGE_EXTERNAL_STORAGE is used.
 
 See `TESTING.md` for required measurements and `SECURITY.md` for protocol details.
+
+## Native design correction 0.1.1
+VersionCode2 keeps package com.ezshare.app and the existing transfer engine. Source-faithful home, files/send, receive, discovery, confirmation, progress, history/detail, settings, optional dark theme and shared components replace the Alpha UI shortcuts. Adaptive launcher and monochrome icons preserve the approved mark. See design/REFERENCE.md for the screen comparison, tokens, motion, honest Alpha deviations and visual verification limits.
+
+Search/category filters apply to the single SAF-selected file. History stores up to100 actual session records locally and clearing it never deletes documents. Name/avatar/theme/reduced-motion preferences persist. QR, pause/resume and app sharing remain clearly labelled coming soon.
+
+UI screenshot tests use native Robolectric/Roborazzi; CI artifacts include EZ-native-design-captures. They are generated Android renders, not physical-device screenshots or approved HTML pixel goldens. Run `./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
+
+Upgrade note: package and versionCode preserve the Android upgrade path, but the initial CI debug keystore was ephemeral. If Android reports signature mismatch, Android cannot upgrade it in-place without the prior signing key. This build does not silently uninstall data or change package ID. Export received files first and make an explicit user decision before uninstalling. Future builds should use a stable user-managed signing key; no private signing key is committed.
