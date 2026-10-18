@@ -1,6 +1,6 @@
-# EZ 1.0.0 release work
+# EZ 1.0.0
 
-Existing native Kotlin/Jetpack Compose project continued from PR2, not rebuilt. App ID`com.ezshare.app`, Android10+, Arabic RTL, approved pastel identity and fixed floating capsule/scroll behavior. Source version1.0.0/versionCode11 is **not a published stable release**. Production signing uses the existing persistent identity. The owner waived physical two-phone acceptance on 2026-10-18; automated tests, signed-build integrity and explicit publication approval remain required. No Alpha APK is being offered as an official release.
+Existing native Kotlin/Jetpack Compose project continued from PR2, not rebuilt. App ID`com.ezshare.app`, Android10+, Arabic RTL, approved pastel identity and fixed floating capsule/scroll behavior. **EZ 1.0.0/versionCode11 is published as a stable signed release:** [Download APK](https://github.com/mozico-565/EZ/releases/download/v1.0.0/EZ-1.0.0.apk) · [Release and checksums](https://github.com/mozico-565/EZ/releases/tag/v1.0.0). Production signing uses the existing persistent identity. The owner waived physical two-phone acceptance on 2026-10-18; automated tests, signed-build integrity and explicit publication approval remain required. No Alpha APK is being offered as an official release.
 
 ## Implemented in this branch
 
@@ -31,7 +31,7 @@ Both phones use compatible protocol2 and the same local router/hotspot (internet
 - Scoped storage cannot enumerate every document without authorization. Non-launcher apps may not be visible; split packages need a complete distributable from a trusted source. Receiving uses app-owned MediaStore Downloads, with no folder chooser or broad write permission. Capacity for an opaque provider is not fabricated.
 - Earlier verified files survive a later interruption. A failed current partial is not marked successful; failed deletion leaves an unpublished IS_PENDING row and reports an error. Process death can leave an expiring pending row. Receipt loss after verified publication can cause sender failure despite a valid receiver file; inspect receiver before retry.
 - Selection and active transfer are in memory; completed/failed file history (up to100) and appearance/device preferences persist locally. Clearing history never deletes files. Foreground service and notification behavior require OEM testing.
-- The repo currently displays Public in GitHub. A published official download link still does not exist merely because source is public; the app verifies a real non-prerelease Release before sharing. This task did not change repository visibility.
+- The repository is public. The official v1.0.0 release is published; the app verifies the real non-prerelease Release before sharing. Repository visibility was not changed.
 
 ## Evidence
 
@@ -40,3 +40,7 @@ Both phones use compatible protocol2 and the same local router/hotspot (internet
 ## Latest fixes
 
 See [automatic saving](release/AUTOMATIC-SAVING.md) for MediaStore publication and history open/share. Standalone installed APK export compares exact installed-source SHA-256 bytes plus package/version and available signing metadata; absent OEM archive metadata is not mislabeled as a mismatch. Ordinary APK file transfer never compares package signers. Split apps retain an honest complete-package limitation.
+
+## Verified release evidence
+
+Signed candidate [39158022188](https://github.com/mozico-565/EZ/actions/runs/39158022188), promoted-main validation [39159309663](https://github.com/mozico-565/EZ/actions/runs/39159309663), and exact published-asset verification [39160735324](https://github.com/mozico-565/EZ/actions/runs/39160735324) all passed. The signed candidate ran 26 core tests, 29 Android/Compose tests, 6 signing/gate checks and 8 native tests on each of API29 and API35 (77 executions). Debug and release lint each reported zero errors and 48 warnings. Physical two-phone testing was waived by the owner and remains not_tested.
