@@ -274,10 +274,7 @@ jobs:
           script: |
             adb install "$RUNNER_TEMP/apk-fixture/fixture.apk"
             adb install-multiple "$RUNNER_TEMP/apk-fixture/SplitBase.apk" "$RUNNER_TEMP/apk-fixture/SplitConfig.apk"
-            chmod +x gradlew
-            ./gradlew --no-daemon :app:connectedDebugAndroidTest
-            mkdir -p native-evidence
-            adb pull /sdcard/Android/data/com.ezshare.app/files/native-apk-sharesheet.png native-evidence/ || true
+            bash scripts/run_native_checks.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
