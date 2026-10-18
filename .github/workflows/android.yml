@@ -1,4 +1,4 @@
-name: EZ Android Alpha
+name: EZ Android validation
 on:
   push:
   pull_request:
@@ -37,10 +37,10 @@ jobs:
           echo "EZ_DEBUG_KEYSTORE_PATH=$HOME/.android/ez-development-debug.jks" >> "$GITHUB_ENV"
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - name: Test, render native UI, lint and build debug APK
+      - name: Test, render native UI, lint and assemble release candidate
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+          ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleRelease
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -48,7 +48,7 @@ jobs:
           path: |
             core/build/reports/tests/
             app/build/reports/tests/
-            app/build/reports/lint-results-debug.*
+            app/build/reports/lint-results-*
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
@@ -58,7 +58,7 @@ jobs:
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
-          name: EZ-Alpha-0.1.1-design-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: EZ-1.0.0-release-unsigned-NOT-INSTALLABLE
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
           retention-days: 14
