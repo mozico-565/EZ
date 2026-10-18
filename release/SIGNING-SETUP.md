@@ -8,8 +8,8 @@ In GitHub (mobile browser works): repository → Settings → Secrets and variab
 |---|---|
 | EZ_RELEASE_KEYSTORE_BASE64 | Base64 encoding of the complete persistent JKS/PKCS12 file, as one line |
 | EZ_RELEASE_STORE_PASSWORD | Keystore password |
-| EZ_RELEASE_KEY_ALIAS | Signing entry alias |
-| EZ_RELEASE_KEY_PASSWORD | Entry password |
+| EZ_RELEASE_KEY_ALIAS | Optional for first-time setup: defaults to `ez-release`; set explicitly for another existing alias |
+| EZ_RELEASE_KEY_PASSWORD | Optional for first-time PKCS12: defaults to the saved store password; set explicitly if different |
 
 Under Variables configure `EZ_RELEASE_CERT_SHA256` with the public SHA-256 certificate fingerprint (64hex characters). Never send private keystore bytes/passwords in chat. No broad PAT is needed: the workflow uses GitHub's scoped job token.
 
@@ -18,9 +18,9 @@ If a production key does not exist, create and retain it under your control usin
 ## First-time setup (owner confirmed no existing production key)
 
 1. In repository Actions Secrets, create `EZ_RELEASE_STORE_PASSWORD` yourself. Use a password manager to generate and retain a random ASCII password of at least 32 characters with no whitespace. Do not type it in chat. It will encrypt the permanent keystore; losing this password and backup can prevent future updates.
-2. Run `android.yml` manually on `fix/native-design-parity`, operation `prepare-first-key`, confirmation `CREATE-FIRST-KEY`. This mode never builds/publishes an APK, refuses reruns and refuses an already configured keystore. Pushes and PRs cannot create a production key. If the default-branch UI cannot expose inputs, first land the reviewed workflow through the normal PR chain; do not remove the confirmation guard.
+2. Run `android.yml` manually on `fix/native-design-parity`, operation `prepare-first-key`, confirmation `CREATE-FIRST-KEY`. This mode never builds/publishes an APK, refuses reruns and refuses an already configured keystore. Pushes and PRs cannot create a production key. The minimal default-branch launcher exposes these inputs; explicitly select the reviewed application branch. The launcher itself loads no secrets and merges no application code. When the PR chain is later merged, retain the full reviewed workflow instead of the launcher stub; do not remove the confirmation guard.
 3. Download `EZ-FIRST-KEY-ENCRYPTED-BACKUP-<run-id>` immediately. It expires after **7 days**. Keep **two private offline copies**, with the password stored separately. This is a password-encrypted PKCS12 (RSA4096, SHA256withRSA, 10000 days, PBES2 protection with 600000 iterations), not a plaintext private key. Base64 is only encoding, not additional encryption. Because this repository is public, other authenticated GitHub users may download the encrypted artifact during retention: a long random password is essential. Never publish the backup in Releases or commit it.
-4. Owner-only: copy `EZ_RELEASE_KEYSTORE_BASE64.txt` from the backup into secret `EZ_RELEASE_KEYSTORE_BASE64`; set secret `EZ_RELEASE_KEY_ALIAS` to `ez-release`; set secret `EZ_RELEASE_KEY_PASSWORD` to the same password used in step1. Keep `EZ_RELEASE_STORE_PASSWORD` unchanged. Set variable `EZ_RELEASE_CERT_SHA256` from `PUBLIC-IDENTITY.json`. Do not send these secret values in chat.
+4. Owner-only: copy `EZ_RELEASE_KEYSTORE_BASE64.txt` from the backup into secret `EZ_RELEASE_KEYSTORE_BASE64`; the prepared workflow defaults to alias `ez-release` and the saved store password, so no second password entry is needed for this new PKCS12. Optional alias/key-password secrets override these defaults for imported identities. Keep `EZ_RELEASE_STORE_PASSWORD` unchanged. Set variable `EZ_RELEASE_CERT_SHA256` from `PUBLIC-IDENTITY.json`. Do not send these secret values in chat.
 5. Run operation `sign`. Verify the APK certificate matches the backed-up identity. Install/test the **exact signed candidate** on both phones before the release gate can pass. Once signing is configured, never run first-key preparation again.
 
 Only the encrypted keystore/base64, public certificate and public identity metadata enter the short-lived artifact. Passwords never enter artifacts, logs, command arguments or source. The workflow does not obtain Secrets-write permissions or a PAT. The owner must enter new credentials; the agent does not fill password fields. An automatic setup test generates and deletes a separate disposable identity; that test identity must never be used for production.
