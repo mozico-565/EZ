@@ -7,7 +7,7 @@ on:
         options: [candidate, publish]
         default: candidate
         required: true
-        description: Build signed candidate, or publish the exact physically tested candidate
+        description: Build signed candidate, or publish the exact approved candidate
       candidate_run_id:
         type: string
         default: ''
@@ -97,15 +97,26 @@ jobs:
           python3 - <<'PY'
           import json
           r=json.load(open('candidate-run.json'))
-          assert r['conclusion']=='success' and r['event']=='workflow_dispatch' and r['path'] in ('.github/workflows/release.yml','.github/workflows/android.yml')
+          assert r['conclusion']=='success' and r['event']=='workflow_dispatch' and r['path']=='.github/workflows/android.yml'
           PY
+      - name: Require Android 10 and 15 native checks in candidate run
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID/jobs?per_page=100" > candidate-jobs.json
+          python3 - <<'PYJOBS'
+          import json
+          jobs=json.load(open('candidate-jobs.json'))['jobs']
+          for name in ('signed-candidate','native-storage-apk (29)','native-storage-apk (35)'):
+              assert any(j['name']==name and j['conclusion']=='success' for j in jobs), 'Missing successful candidate check: '+name
+          PYJOBS
       - uses: actions/download-artifact@v4
         with:
           name: EZ-1.0.0-signed-candidate
           path: candidate
           run-id: ${{ inputs.candidate_run_id }}
           github-token: ${{ github.token }}
-      - name: Gate exact signed binary against two-phone acceptance
+      - name: Gate exact signed binary against recorded owner acceptance decision
         run: |
           python3 - <<'PY'
           import json

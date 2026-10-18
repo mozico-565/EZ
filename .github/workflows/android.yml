@@ -237,3 +237,53 @@ jobs:
       - name: Remove runner-local signing material
         if: always()
         run: rm -rf "$RUNNER_TEMP/ez-owner-backup"
+
+  native-storage-apk:
+    if: github.event_name != 'workflow_dispatch' || inputs.operation != 'prepare-first-key'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 35]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Enable emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Build independent signed third-party fixture
+        run: bash scripts/build_apk_fixture.sh
+      - name: Real MediaStore, APK export and Android Sharesheet checks
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb install "$RUNNER_TEMP/apk-fixture/fixture.apk"
+            adb install-multiple "$RUNNER_TEMP/apk-fixture/SplitBase.apk" "$RUNNER_TEMP/apk-fixture/SplitConfig.apk"
+            chmod +x gradlew
+            ./gradlew --no-daemon :app:connectedDebugAndroidTest
+            mkdir -p native-evidence
+            adb pull /sdcard/Android/data/com.ezshare.app/files/native-apk-sharesheet.png native-evidence/ || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: EZ-native-API${{ matrix.api }}-storage-apk-evidence
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+            native-evidence/
+          if-no-files-found: warn
