@@ -61,7 +61,7 @@ object BatchEngine {
                 val verifyStart=System.nanoTime();val saved=pending.commit();committed=true;times+=PhaseTiming("storage_readback_and_publish",i,System.nanoTime()-verifyStart)
                 ch.send(encode(5){it.writeLong(count);it.write(hash)});val r=Result(meta,count,hash.hex(),streamTime,saved);results+=r;onComplete(r);completedBytes+=count
                 onProgress(BatchProgress(Progress(completedBytes,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i+1,"verified"))
-            }finally{if(!committed){runCatching{pending.output.close()};runCatching{pending.abort()}.exceptionOrNull()?.let{throw IOException("Incomplete file cleanup failed; .ezpart may remain",it)}}}
+            }finally{if(!committed){runCatching{pending.output.close()};runCatching{pending.abort()}.exceptionOrNull()?.let{throw IOException("Incomplete file cleanup failed; pending entry may remain",it)}}}
         }
         return BatchResult(m.session,results,times+PhaseTiming("total_session",-1,System.nanoTime()-start),System.nanoTime()-start)
     }

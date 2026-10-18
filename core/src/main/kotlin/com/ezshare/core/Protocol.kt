@@ -22,9 +22,15 @@ data class Metadata(val name: String, val mime: String, val size: Long) {
     }
     companion object { const val MAX_BYTES = 16L * 1024 * 1024 * 1024 }
 }
-fun safeFilename(name: String): String = name.substringAfterLast('/').substringAfterLast('\\')
-    .replace(Regex("[\\p{Cntrl}<>:\"/\\\\|?*\\u202A-\\u202E\\u2066-\\u2069]"), "_")
-    .trim().trim('.').take(100).ifBlank { "received-file" }
+fun safeFilename(name: String): String {
+    val clean = name.substringAfterLast('/').substringAfterLast('\\')
+        .replace(Regex("[\\p{Cntrl}<>:\"/\\\\|?*\\u202A-\\u202E\\u2066-\\u2069]"), "_")
+        .trim().trim('.').ifBlank { "received-file" }
+    if(clean.length <= 100) return clean
+    val dot = clean.lastIndexOf('.')
+    val extension = if(dot > 0 && clean.length-dot <= 24) clean.substring(dot) else ""
+    return clean.take(100-extension.length)+extension
+}
 fun uniqueFilename(name: String, exists: (String) -> Boolean): String {
     val clean = safeFilename(name)
     if (!exists(clean)) return clean
