@@ -36,7 +36,7 @@ class DesignCaptureTest{
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
     private fun render(screen:String="home",dark:Boolean=false,state:TransferUi=TransferUi(),sheet:String="",fontScale:Float=1f){
         compose.activity.enableEdgeToEdge()
-        compose.setContent{CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density,fontScale)){EzTheme(dark=dark,quiet=true){EzApp(state,EzPreferences(name="جهازي · EZ"),emptyList(),emptyList(),initialDestination=screen,initialSheet=sheet)}}}
+        compose.setContent{CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density,fontScale)){EzTheme(dark=dark,quiet=true){EzApp(state,EzPreferences(name="جهازي · EZ"),emptyList(),if(state.listening)listOf("192.168.49.1") else emptyList(),initialDestination=screen,initialSheet=sheet)}}}
         compose.waitForIdle()
     }
     private fun shot(name:String){compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")}
@@ -44,11 +44,12 @@ class DesignCaptureTest{
     @Test fun homeDark(){render(dark=true);shot("home-dark-412")}
     @Test @Config(qualifiers="ar-rSA-w360dp-h800dp-xhdpi") fun compactHome(){render();shot("home-light-360");compose.onNodeWithText("استقبال").assertIsDisplayed()}
     @Test fun largeFontHome(){render(fontScale=1.5f);shot("home-font150-412")}
+    @Test fun receiverQrLive(){render("receive",state=TransferUi(listening=true,port=33045,pairingNonce="a".repeat(32),pairingExpiry=System.currentTimeMillis()/1000+600));shot("receive-waiting-412")}
     @Test fun files(){render("files");shot("files-empty-412")}
     @Test fun selectedLongFilename(){render("files",state=TransferUi(picked=PickedFile(Uri.parse("content://capture/test"),Metadata("غروب الشمس على شاطئ البحر — النسخة الأصلية عالية الدقة.jpg","image/jpeg",6_400_000_000))));shot("files-selected-long-name-412")}
     @Test fun receive(){render("receive");shot("receive-412")}
     @Test fun discover(){render("discover");shot("discover-empty-412")}
-    @Test fun scannerUnavailable(){render("scanner");shot("scanner-coming-soon-412")}
+    @Test fun scannerPermissionUnavailable(){render("scanner");shot("scanner-permission-412")}
     @Test fun confirmation(){render("confirm",state=TransferUi(request=PairRequest("هاتف الاختبار","482716",Metadata("صورة الاختبار.jpg","image/jpeg",4200000),true)));shot("confirm-412")}
     @Test fun transferFixture(){render("transfer",state=TransferUi(filename="ملف اختبار بصري.jpg",peer="جهاز اختبار بصري",busy=true,progress=Progress(2_100_000,4_200_000,1_000_000_000,0.0)));shot("transfer-ui-fixture-412")}
     @Test fun transferFailure(){render("transfer",state=TransferUi(filename="فيديو لم يكتمل.mp4",error="انقطع الاتصال. لم يكتمل الملف.",status="توقفت العملية",peer="جهاز اختبار",progress=Progress(1200,4200000,1_000_000_000,0.0)));shot("transfer-failure-412")}
