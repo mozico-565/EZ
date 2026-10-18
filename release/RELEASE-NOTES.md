@@ -15,3 +15,5 @@ Android10+, app IDcom.ezshare.app. Both peers must use compatible protocol2. Pri
 The owner explicitly requested publication without two-phone transfer acceptance on 2026-10-18. Those physical tests remain not performed; the waiver is recorded separately from automated CI/emulator results. No physical throughput, camera interoperability or OEM background-transfer assurance is claimed. Repository privacy still controls download access. The app shares an official link only when it verifies a published non-prerelease URL available without authentication; otherwise APK sharing remains available.
 
 VersionName 1.0.0, versionCode 11. This build updates the earlier production-signed candidate with the same persistent certificate.
+
+Automated validation: 26 core + 29 Android/Compose + 6 signing/gate tests; 8 real Android instrumentation tests on each of API29 and API35. No failures. Debug/release lint: 0 errors, 48 warnings each. Exact build and owner waiver are attached with this Release.
