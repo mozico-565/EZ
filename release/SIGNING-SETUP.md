@@ -15,7 +15,7 @@ Under Variables configure `EZ_RELEASE_CERT_SHA256` with the public SHA-256 certi
 
 If a production key does not exist, create and retain it under your control using Android Studio Generate Signed Bundle/APK or the JDK's official keytool, then configure the above. This is an essential owner setup, not a reason to label a debug build stable.
 
-## First-time setup (owner confirmed no existing production key)
+## First-time setup (completed for EZ; do not generate another key)
 
 1. In repository Actions Secrets, create `EZ_RELEASE_STORE_PASSWORD` yourself. Use a password manager to generate and retain a random ASCII password of at least 32 characters with no whitespace. Do not type it in chat. It will encrypt the permanent keystore; losing this password and backup can prevent future updates.
 2. Run `android.yml` manually on `fix/native-design-parity`, operation `prepare-first-key`, confirmation `CREATE-FIRST-KEY`. This mode never builds/publishes an APK, refuses reruns and refuses an already configured keystore. Pushes and PRs cannot create a production key. The minimal default-branch launcher exposes these inputs; explicitly select the reviewed application branch. The launcher itself loads no secrets and merges no application code. When the PR chain is later merged, retain the full reviewed workflow instead of the launcher stub; do not remove the confirmation guard.

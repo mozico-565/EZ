@@ -1,0 +1,20 @@
+{
+  "package_id": "com.ezshare.app",
+  "version_name": "1.0.0",
+  "debuggable": false,
+  "apk_sha256": "a1e1546a21a571c58fb615245b360b28859b253fe5d8c8c51fde490c5bd7bf11",
+  "certificate_sha256": "e8b79642b969337b9550dfb691994e1d90f52b438d3c8a82c4fcbb8048b3a908",
+  "source_commit": "2ba7ee7991c1662296918219c7b42873534378a4",
+  "source_fingerprint": "a846550477af9da1c22a67aedcdcf636e0c6fbab54784d40203cb66b73408aaa",
+  "workflow_run_id": "39138474099",
+  "workflow_url": "https://github.com/mozico-565/EZ/actions/runs/39138474099",
+  "core_tests": 25,
+  "android_tests": 28,
+  "signing_setup_tests": 4,
+  "release_gate_tests": 2,
+  "test_failures": 0,
+  "lint_errors": 0,
+  "lint_warnings_per_variant": 44,
+  "physical_acceptance_completed": false,
+  "official_release_published": false
+}

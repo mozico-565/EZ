@@ -1,25 +1,28 @@
-# EZ 1.0.0 release work — gates still closed
+# EZ 1.0.0 — signed candidate ready; official publication blocked on acceptance
 
-Continued PR2 at7445dae (historical home failure already fixed). Existing main/alpha branches are preserved; work remains on fix/native-design-parity, no force-push or blind merge. Capsule navigation/scrolling unchanged.
+The existing Kotlin/Jetpack Compose application and PR2 are preserved on `fix/native-design-parity`. No force-push, blind application merge or capsule/scroll redesign was performed. Main contains only the original README and a minimal read-only manual workflow launcher; reconcile that launcher normally when merging the reviewed PR chain.
 
-Implemented in source: transparent/themed header mark, corrected Receive vector, complete verified APK export/sharesheet, official-release link verification, MediaStore/authorized-folder browser with7categories/search/sort/thumbnails/multi-select, CameraX/ZXing local QR and strict payload validation, protocol2 approved batch transfer, per-file receipts/partial safety/history, stage timings and release gates.
+## Verified signed binary
 
-Evidence so far: original12 core tests plus13 batch/QR tests pass locally. First integrated Android release build8d9b82f passed run39096801377, including Android tests, debug/release lint and assembleRelease. Later selection/scanner/gate tests and final refinements are being validated in the next run. Native captures are review images, not physical-camera proof.
+GitHub Actions run **39138474099** succeeded for candidate source **2ba7ee7991c1662296918219c7b42873534378a4**. The APK is `com.ezshare.app`, versionName **1.0.0**, versionCode **10**, non-debuggable, signed with the permanent EZ production identity. CI apksigner verification passed against the pinned certificate. Downloaded binary SHA-256 was checked again against candidate metadata.
 
-Synthetic JVM localhost4MB/100MB/1GB and64small-file batch timings are recorded with source and limitations. No device/radio benchmarks or fixed2second promise.
+- APK SHA-256: `a1e1546a21a571c58fb615245b360b28859b253fe5d8c8c51fde490c5bd7bf11`
+- Certificate SHA-256: `e8b79642b969337b9550dfb691994e1d90f52b438d3c8a82c4fcbb8048b3a908`
+- Validation: **25 core + 28 Android/Compose + 4 signing-setup + 2 release-gate tests**, zero failures. Debug/release lint: zero errors, 44 warnings each. Signed assembleRelease succeeded. Eighteen native captures were produced; fixture screens are not physical transfer/camera evidence.
+- The owner-approved first-key run39137952284 succeeded. The encrypted backup was checked for certificate/hash/base64 consistency and saved separately. No private keystore or password is committed. Public identity: PRODUCTION-IDENTITY.json. Exact APK evidence: SIGNED-CANDIDATE.json.
 
-Production signing: repository/environment Actions secrets were empty when inspected. Pipeline is prepared but no production key has been supplied or used. No signed candidate/stable v1.0.0 tag/Release exists from this task. Physical matrix remains not_tested, with explicit fail-closed checks binding exact APK/certificate/source/approval. Official link remains honestly unavailable until a real published release is verified. GitHub currently displays Public; this task did not change visibility.
+## Implemented scope
 
-Next essential owner input after code validation: persistent signing credentials in Actions secrets, then installation/testing of the exact signed candidate on two phones. Do not mark complete or publish stable before those gates.
+Themed transparent header mark, corrected Receive vector, verified complete APK export/native Sharesheet and honest published-link lookup; native MediaStore/authorized SAF file browser with seven categories, search/sort/thumbnails/persistent multi-selection; CameraX/ZXing local QR pairing with strict expiry/address validation and both-phone SAS approval; encrypted protocol2 batches with per-file integrity/readback/receipt, safe partial/error/history handling; actual per-file/overall progress and stage timings. Existing visual tokens, launcher geometry, navigation, RTL, themes and motion remain preserved.
 
+Synthetic localhost 4MB/100MB/1GB and 64-small-file timings are reproducible benchmarks only, not radio/device measurements or a two-second promise. Wi-Fi Direct, pause/resume and process-death recovery are not implemented or claimed.
 
-## First-time production signing preparation
+## Outstanding official-release gates
 
-Owner confirmed no existing production signing key. Added intentional manual first-key setup to the existing Android workflow, an encrypted PKCS12 backup generator and three tests (missing password, existing-key refusal, encrypted round trip / wrong-password / overwrite protection). The owner must enter a new long random password directly in Actions Secrets before generation. No production key has been generated yet; no signed APK or official release is claimed. The latest application binary/source remains the previously validated 73fd182 candidate; these changes affect signing infrastructure/docs only.
+1. **Real two-phone acceptance is unperformed.** Install this exact signed APK on both phones, follow PHYSICAL-TESTING.md, and record actual devices/results in PHYSICAL-ACCEPTANCE.json. Its hashes are prefilled, but completed remains false and all tests remain not_tested. An owner form provided with the review files exports the same schema without preselecting success.
+2. **Durable CI keystore Secret is not yet configured.** The first signed candidate imported the approved encrypted backup from run39137952284 using the saved password and pinned certificate. That bootstrap expires with its seven-day artifact. Keep two private backup copies and have the owner enter the backed-up base64 into EZ_RELEASE_KEYSTORE_BASE64 before future release builds. Do not change the password or create another identity.
+3. After actual acceptance, set EZ_RELEASE_APPROVED_SHA to this candidate's exact source commit and reconcile PR2→alpha / PR1→main through normal reviewed merges, retaining the full production workflow. The publisher downloads and verifies this exact tested signed artifact; it must not rebuild a different APK after acceptance.
 
-The publisher now accepts the exact successful manual signed-candidate artifact from android.yml as well as release.yml, preserving all binary/hash/certificate/source/two-device acceptance checks. This lets the first candidate be tested from the existing branch without rebuilding it after acceptance.
+No v1.0.0 stable tag or GitHub Release has been published. The official-link option remains unavailable until a real release exists. The signed APK is ready for final acceptance, not proof that physical tests have passed. The repository currently displays Public; this task did not change its visibility.
 
-
-## Production signing identity created (18 October 2026)
-
-Owner explicitly approved creation and seven-day encrypted backup upload on the public repository. Run39137952284 succeeded; encrypted backup integrity, public certificate and encoded-keystore consistency were verified. Public identity is in PRODUCTION-IDENTITY.json; private bytes remain outside source. Persistent keystore Secret is not yet configured. Added an explicit first-candidate import from the verified backup run to reuse the owner-entered password without copying private material through chat. Pinning, provenance and tamper rejection are covered by the signing-setup tests. Production signing/build and physical acceptance still must succeed before an official release can be claimed.
+Old Alpha debug installs have a different signing identity and may require uninstall/reinstall. Preserve important app data first. Future production updates must retain the new permanent EZ certificate.

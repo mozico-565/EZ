@@ -3,9 +3,9 @@
   "tested_at": "",
   "tested_by": "",
   "devices": [],
-  "apk_sha256": "",
-  "certificate_sha256": "",
-  "source_fingerprint": "",
+  "apk_sha256": "a1e1546a21a571c58fb615245b360b28859b253fe5d8c8c51fde490c5bd7bf11",
+  "certificate_sha256": "e8b79642b969337b9550dfb691994e1d90f52b438d3c8a82c4fcbb8048b3a908",
+  "source_fingerprint": "a846550477af9da1c22a67aedcdcf636e0c6fbab54784d40203cb66b73408aaa",
   "results": {
     "discovery": "not_tested",
     "qr_camera_both_directions": "not_tested",
