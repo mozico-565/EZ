@@ -125,9 +125,30 @@ jobs:
           python3 scripts/verify_release_gate.py release/PHYSICAL-ACCEPTANCE.json candidate/build-metadata.json candidate/EZ-1.0.0.apk
       - name: Create immutable version tag and publish verified assets
         run: |
-          test -z "$(git ls-remote --tags origin refs/tags/v1.0.0)" || { echo 'v1.0.0 already exists; refusing overwrite.'; exit 1; }
           source_commit=$(python3 -c "import json;print(json.load(open('candidate/build-metadata.json'))['source_commit'])")
-          git tag v1.0.0 "$source_commit"
-          git push origin refs/tags/v1.0.0
-          gh release create v1.0.0 candidate/EZ-1.0.0.apk candidate/SHA256SUMS.txt candidate/build-metadata.json release/PHYSICAL-ACCEPTANCE.json release/TEST-EVIDENCE.md --verify-tag --title 'EZ 1.0.0' --notes-file release/RELEASE-NOTES.md
+          if git ls-remote --exit-code --tags origin refs/tags/v1.0.0 >/dev/null; then
+            git fetch origin refs/tags/v1.0.0:refs/tags/v1.0.0
+            test "$(git rev-list -n 1 v1.0.0)" = "$source_commit" || { echo 'Existing version tag points to a different source; refusing overwrite.'; exit 1; }
+          else
+            git tag v1.0.0 "$source_commit"
+            git push origin refs/tags/v1.0.0 || { echo 'Tag creation denied. Use the owner GitHub release UI for the exact approved source; do not broaden the Actions token.'; exit 1; }
+          fi
+          if gh release view v1.0.0 --json url,tagName,isDraft,isPrerelease > published-release.json; then
+            python3 - <<'PYRELEASE'
+          import json
+          r=json.load(open('published-release.json'))
+          assert r['tagName']=='v1.0.0' and not r['isDraft'] and not r['isPrerelease']
+          assert r['url']=='https://github.com/mozico-565/EZ/releases/tag/v1.0.0'
+          PYRELEASE
+            mkdir published-assets
+            gh release download v1.0.0 --dir published-assets --pattern EZ-1.0.0.apk --pattern SHA256SUMS.txt --pattern build-metadata.json --pattern PHYSICAL-ACCEPTANCE.json --pattern TEST-EVIDENCE.md
+            cmp candidate/EZ-1.0.0.apk published-assets/EZ-1.0.0.apk
+            cmp candidate/SHA256SUMS.txt published-assets/SHA256SUMS.txt
+            cmp candidate/build-metadata.json published-assets/build-metadata.json
+            cmp release/PHYSICAL-ACCEPTANCE.json published-assets/PHYSICAL-ACCEPTANCE.json
+            cmp release/TEST-EVIDENCE.md published-assets/TEST-EVIDENCE.md
+            echo 'Existing stable release has the exact verified binary, metadata and acceptance decision. Nothing overwritten.'
+          else
+            gh release create v1.0.0 candidate/EZ-1.0.0.apk candidate/SHA256SUMS.txt candidate/build-metadata.json release/PHYSICAL-ACCEPTANCE.json release/TEST-EVIDENCE.md --verify-tag --title 'EZ 1.0.0' --notes-file release/RELEASE-NOTES.md
+          fi
           gh release view v1.0.0 --json url,tagName,isDraft,isPrerelease
