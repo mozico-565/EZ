@@ -1,8 +1,10 @@
 # Current release acceptance
 
+Signed candidate run39138474099 passed 25 core, 28 Android/Compose, 4 signing-setup and 2 gate tests, plus debug/release lint and signed assembleRelease. See release/SIGNED-CANDIDATE.json for the exact binary/certificate/source. The 17-case **physical** matrix has not been performed. Install the same production-signed APK on two phones; never use a historical debug artifact for current acceptance.
+
 See release/PHYSICAL-TESTING.md and release/PHYSICAL-ACCEPTANCE.json for1.0.0. Historical Alpha checks below remain context, not current release evidence.
 
-# Two-phone validation — required, not performed remotely
+# Historical Alpha two-phone validation — not current release evidence
 
 Record both models, Android versions, APK run/commit, Wi-Fi band/router or hotspot, approximate distance and free destination capacity. Android14/15 are useful targets; exact models are unknown.
 
