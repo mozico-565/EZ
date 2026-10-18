@@ -25,6 +25,7 @@ object BatchEngine {
         val approveStart=System.nanoTime();requireProtocol(confirm(m,ch.peerName,ch.sas),"Pairing rejected locally");requireProtocol(ch.receive().contentEquals(byteArrayOf(2)),"Receiver rejected the transfer");times+=PhaseTiming("approval",-1,System.nanoTime()-approveStart)
         var completedBytes=0L;var streamingNanos=0L
         m.files.forEachIndexed{i,meta->
+            onProgress(BatchProgress(Progress(completedBytes,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i,"preparing"))
             c.transferWindow();val meter=ProgressMeter(meta.size);val begin=System.nanoTime();val digest=MessageDigest.getInstance("SHA-256");var count=0L;var last=0L
             sources[i]().use{input->val buffer=ByteArray(64*1024+1);buffer[0]=3
                 while(true){if(c.cancelled.get())throw IOException("Cancelled");val n=input.read(buffer,1,buffer.size-1);if(n<0)break;if(n==0)continue;count+=n;requireProtocol(count<=Metadata.MAX_BYTES&&(meta.size<0||count<=meta.size),"Source length changed");digest.update(buffer,1,n);ch.send(buffer.copyOf(n+1),count==n.toLong());if(count==n.toLong())times+=PhaseTiming("first_wire_chunk",i,System.nanoTime()-begin)
@@ -44,6 +45,7 @@ object BatchEngine {
         val approvalStart=System.nanoTime();if(!approve(m,ch.peerName,ch.sas)){ch.send(byteArrayOf(9));throw ProtocolException("Receiver rejected")};times+=PhaseTiming("approval",-1,System.nanoTime()-approvalStart)
         var completedBytes=0L;var streamingNanos=0L
         m.files.forEachIndexed{i,meta->
+            onProgress(BatchProgress(Progress(completedBytes,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i,"preparing"))
             val pending=create(meta);var committed=false
             try{
                 if(i==0)ch.send(byteArrayOf(2));c.transferWindow();val meter=ProgressMeter(meta.size);val begin=System.nanoTime();val digest=MessageDigest.getInstance("SHA-256");var count=0L;var last=0L;var hash=ByteArray(0);var writeNanos=0L
@@ -59,7 +61,7 @@ object BatchEngine {
                 val verifyStart=System.nanoTime();val saved=pending.commit();committed=true;times+=PhaseTiming("storage_readback_and_publish",i,System.nanoTime()-verifyStart)
                 ch.send(encode(5){it.writeLong(count);it.write(hash)});val r=Result(meta,count,hash.hex(),streamTime,saved);results+=r;onComplete(r);completedBytes+=count
                 onProgress(BatchProgress(Progress(completedBytes,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i+1,"verified"))
-            }finally{if(!committed){runCatching{pending.output.close()};runCatching{pending.abort()}}}
+            }finally{if(!committed){runCatching{pending.output.close()};runCatching{pending.abort()}.exceptionOrNull()?.let{throw IOException("Incomplete file cleanup failed; .ezpart may remain",it)}}}
         }
         return BatchResult(m.session,results,times+PhaseTiming("total_session",-1,System.nanoTime()-start),System.nanoTime()-start)
     }
