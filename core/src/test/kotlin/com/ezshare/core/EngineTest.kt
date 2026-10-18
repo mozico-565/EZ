@@ -10,6 +10,7 @@ import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 
 class EngineTest {
+    @Test fun longArabicNamesKeepApkExtension(){val clean=safeFilename("ملف".repeat(70)+".apk");assertTrue(clean.endsWith(".apk"));assertTrue(clean.length<=100);assertTrue(uniqueFilename(clean){it==clean}.endsWith(" (1).apk"))}
     @Test fun sanitizesNamesAndDuplicates(){assertEquals("a.txt",safeFilename("../../a.txt"));assertEquals("evil.txt",safeFilename("C:\\private\\evil.txt"));assertEquals("received-file",safeFilename("..."));assertFalse(safeFilename("ab\u202ecd").contains('\u202e'));assertEquals("a (1).txt",uniqueFilename("a.txt"){it=="a.txt"})}
     @Test fun rejectsInvalidMetadata(){for(size in listOf(-2L,Metadata.MAX_BYTES+1)){assertThrows(IllegalArgumentException::class.java){Metadata("a","text/plain",size).validate()}};assertThrows(IllegalArgumentException::class.java){Metadata("","text/plain",1).validate()};assertThrows(IllegalArgumentException::class.java){Metadata("a","bad\n",1).validate()}}
     @Test fun progressUsesMonotonicActualByteDeltas(){var n=0L;val meter=ProgressMeter(10_000_000){n};n=1_000_000_000;val p=meter.sample(2_000_000);assertEquals(2.0,p.currentMBps,0.0001);assertEquals(20.0,p.percent!!,0.001);assertEquals(4.0,p.etaSeconds!!,0.001);n=3_000_000_000;val q=meter.sample(4_000_000);assertEquals(1.0,q.currentMBps,0.001);assertEquals(4.0/3,q.averageMBps,0.001);assertNull(Progress(5,-1,1,1.0).percent)}
