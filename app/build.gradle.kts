@@ -2,8 +2,8 @@ plugins { id("com.android.application"); kotlin("android"); id("org.jetbrains.ko
 android {
     namespace = "com.ezshare.app"
     compileSdk = 35
-    defaultConfig { applicationId = "com.ezshare.app"; minSdk = 29; targetSdk = 35; versionCode = 2; versionName = "0.1.1-alpha-design" }
-    buildFeatures { compose = true }
+    defaultConfig { applicationId = "com.ezshare.app"; minSdk = 29; targetSdk = 35; versionCode = 10; versionName = "1.0.0" }
+    buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true; unitTests.all { it.systemProperty("roborazzi.test.record", "true"); it.maxHeapSize = "2g" } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
@@ -14,10 +14,29 @@ android {
             }
         }
     }
-    buildTypes { release { isMinifyEnabled = false } }
+    signingConfigs {
+        create("production") {
+            System.getenv("EZ_RELEASE_STORE_FILE")?.let { storeFile=file(it) }
+            storePassword=System.getenv("EZ_RELEASE_STORE_PASSWORD")
+            keyAlias=System.getenv("EZ_RELEASE_KEY_ALIAS")
+            keyPassword=System.getenv("EZ_RELEASE_KEY_PASSWORD")
+        }
+    }
+    buildTypes {
+        debug { versionNameSuffix="-dev" }
+        release {
+            isDebuggable=false; isMinifyEnabled=false
+            if(System.getenv("EZ_RELEASE_STORE_FILE")!=null)signingConfig=signingConfigs.getByName("production")
+        }
+    }
 }
 dependencies {
     implementation(project(":core"))
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("com.google.zxing:core:3.5.3")
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
