@@ -2,120 +2,77 @@ package com.ezshare.app
 
 import android.Manifest
 import android.app.Application
-import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Send
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.*
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.activity.SystemBarStyle
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ezshare.core.*
-import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-class EZViewModel(app:Application):AndroidViewModel(app){val controller=(app as EZApplication).transfers;val ui=controller.ui}
-class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);enableEdgeToEdge();setContent{MaterialTheme(colorScheme=lightColorScheme(primary=Color(0xff2385e8),background=Color.White,surface=Color.White,onSurface=Color(0xff111111))){CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl){EZScreen()}}}}}
-private val Purple=Color(0xffbaa3f6);private val Orange=Color(0xffffc568);private val Blue=Color(0xffbbd8ff);private val Pink=Color(0xfff3b4eb)
-@Composable fun EZScreen(vm:EZViewModel=viewModel()){
-    val controller=vm.controller;val state by vm.ui.collectAsStateWithLifecycle();var address by rememberSaveable{mutableStateOf("")};var tab by rememberSaveable{mutableIntStateOf(0)}
-    val context=androidx.compose.ui.platform.LocalContext.current
-    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){it?.let(controller::pick)}
-    val folderPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()){it?.let(controller::folder)}
-    val notifications=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){granted->if(!granted)Toast.makeText(context,"يمكن متابعة النقل؛ قد يُخفي النظام الإشعار",Toast.LENGTH_LONG).show()}
-    fun notifyPermission(){if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)notifications.launch(Manifest.permission.POST_NOTIFICATIONS)}
-    fun openSend(){tab=1;controller.page("send")}
-    Scaffold(containerColor=Color.White,contentWindowInsets=WindowInsets.safeDrawing,bottomBar={
-        Surface(color=Color(0xff101017),shape=RoundedCornerShape(50.dp),modifier=Modifier.navigationBarsPadding().padding(horizontal=24.dp,vertical=12.dp)){
-            Row(Modifier.fillMaxWidth().padding(6.dp),horizontalArrangement=Arrangement.SpaceAround){listOf("الرئيسية","الملفات","النتيجة","حول EZ").forEachIndexed{i,label->
-                val active=tab==i
-                Surface(onClick={tab=i;controller.page(if(i==1)"send" else if(i==2)"result" else "home")},color=if(active)Color.White else Color.Transparent,shape=RoundedCornerShape(40.dp)){
-                    Column(Modifier.widthIn(min=60.dp).padding(8.dp),horizontalAlignment=Alignment.CenterHorizontally){Icon(listOf(Icons.Outlined.Home,Icons.Outlined.Folder,Icons.Outlined.CheckCircle,Icons.Outlined.Info)[i],null,tint=if(active)Color.Black else Color.LightGray);Text(label,fontSize=10.sp,color=if(active)Color.Black else Color.LightGray)}
-                }
-            }}
-        }
-    }){padding->Column(Modifier.fillMaxSize().padding(padding)){
-        Row(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
-            Image(painterResource(R.drawable.ez_logo),"شعار EZ",Modifier.width(56.dp).height(28.dp));Column(Modifier.weight(1f).padding(horizontal=12.dp)){Text("أهلًا، خلّنا نشارك!",fontWeight=FontWeight.Bold);Text("Alpha 0.1 · شبكة Wi-Fi محلية",fontSize=10.sp,color=Color.Gray)}
-            if(state.stage!="home")IconButton(onClick={tab=0;controller.page("home")}){Icon(Icons.AutoMirrored.Outlined.ArrowBack,"العودة للرئيسية")}
-        }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
-            if(state.error!=null)Surface(color=Color(0xffffeddf),shape=RoundedCornerShape(20.dp)){Text(state.error!!,Modifier.padding(16.dp),fontSize=12.sp)}
-            if(state.busy&&state.progress==null) {LinearProgressIndicator(Modifier.fillMaxWidth());Text(state.status,fontSize=13.sp)}
-            AnimatedContent(targetState=if(tab==3)"about" else state.stage,label="screen"){page->Column(verticalArrangement=Arrangement.spacedBy(16.dp)){
-                when(page){
-                    "home"->{
-                        Surface(color=Purple,shape=RoundedCornerShape(28.dp)){Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("ملفاتك توصل.\nبلمح البصر.",fontSize=28.sp,fontWeight=FontWeight.Bold);Text("شارك ملفًا حقيقيًا عبر شبكتك المحلية.",fontSize=12.sp);Spacer(Modifier.height(12.dp));Button(onClick={openSend()},colors=ButtonDefaults.buttonColors(containerColor=Color.Black)){Text("ابدأ المشاركة")}};Image(painterResource(R.drawable.transfer_art),null,Modifier.width(120.dp).height(170.dp))}}
-                        Text("نشارك؟",fontSize=22.sp,fontWeight=FontWeight.Bold)
-                        Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                            Surface(onClick={openSend()},color=Orange,shape=RoundedCornerShape(28.dp),modifier=Modifier.weight(1f)){Column(Modifier.padding(20.dp).heightIn(min=155.dp),verticalArrangement=Arrangement.SpaceBetween){Icon(Icons.AutoMirrored.Outlined.Send,null);Text("إرسال",fontSize=30.sp);Text("اختر ملفًا من جهازك",fontSize=12.sp)}}
-                            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(12.dp)){Surface(onClick={tab=0;controller.page("receive")},color=Blue,shape=RoundedCornerShape(28.dp)){Column(Modifier.fillMaxWidth().padding(20.dp)){Icon(Icons.Outlined.Download,null);Text("استقبال",fontSize=28.sp);Text("وافق، ثم استقبل",fontSize=12.sp)}};Surface(color=Pink,shape=RoundedCornerShape(24.dp)){Text("قارن الرمز على الهاتفين\nقبل الموافقة.",Modifier.fillMaxWidth().padding(14.dp),fontSize=12.sp)}}
-                        }
-                        Note("يتطلب هاتفين على شبكة Wi-Fi نفسها، أو نقطة اتصال أحد الهاتفين. لا يحتاج النقل إلى الإنترنت. Wi-Fi Direct والاستكمال لاحقًا.")
-                        if(state.busy||state.progress!=null)OutlinedButton(onClick={tab=2;controller.page("result")},modifier=Modifier.fillMaxWidth()){Text("عرض حالة النقل")}
-                    }
-                    "send"->{
-                        Text("اختر ما تريد مشاركته",fontSize=24.sp,fontWeight=FontWeight.Bold)
-                        Button(onClick={picker.launch(arrayOf("*/*"))},enabled=!state.busy,modifier=Modifier.fillMaxWidth()){Icon(Icons.Outlined.AttachFile,null);Text(" اختيار ملف حقيقي")}
-                        state.picked?.let{file->Surface(color=Color(0xfff4f0fc),shape=RoundedCornerShape(24.dp)){Column(Modifier.fillMaxWidth().padding(18.dp)){Text(file.metadata.name,fontWeight=FontWeight.Bold);Text(if(file.metadata.size<0)"الحجم غير معروف؛ سيُقاس أثناء النقل" else humanSize(file.metadata.size),fontSize=12.sp)}}}
-                        Button(onClick={controller.startDiscovery()},enabled=!state.busy,modifier=Modifier.fillMaxWidth()){Text("البحث عن مستقبلين")}
-                        Text(state.discoveryMessage.ifBlank{"فعّل الاستقبال على الهاتف الآخر."},fontSize=12.sp,color=Color.Gray)
-                        state.peers.forEach{peer->OutlinedButton(onClick={notifyPermission();controller.send(peer.address)},enabled=state.picked!=null&&!state.busy,modifier=Modifier.fillMaxWidth()){Text("${peer.name}\n${peer.address}")}}
-                        OutlinedTextField(value=address,onValueChange={address=it},label={Text("العنوان اليدوي IP:PORT")},placeholder={Text("192.168.1.8:34567")},singleLine=true,modifier=Modifier.fillMaxWidth(),enabled=!state.busy)
-                        Button(onClick={notifyPermission();controller.send(address)},enabled=state.picked!=null&&!state.busy&&address.isNotBlank(),modifier=Modifier.fillMaxWidth()){Text("اتصال وطلب مشاركة الملف")}
-                        if(state.busy)OutlinedButton(onClick={controller.cancel()},modifier=Modifier.fillMaxWidth()){Text("إلغاء الاتصال أو النقل")}
-                        Note("اسم الجهاز وعنوانه لا يثبتان هويته. قارن رمز الأرقام الستة قبل الموافقة على الهاتفين.")
-                    }
-                    "receive"->{
-                        Text("جاهز للاستقبال",fontSize=26.sp,fontWeight=FontWeight.Bold)
-                        Text("جهازك: ${controller.identity}")
-                        OutlinedButton(onClick={folderPicker.launch(null)},enabled=!state.busy&&!state.listening,modifier=Modifier.fillMaxWidth()){Text(if(state.folder==null)"اختر مجلد الحفظ داخل المستندات" else "تغيير مجلد الحفظ")}
-                        if(state.folder!=null)Text("مجلد الحفظ محدد. يلزم دعمه لإنشاء الملفات وإعادة تسميتها.",fontSize=12.sp)
-                        Button(onClick={notifyPermission();controller.receive()},enabled=state.folder!=null&&!state.listening&&!state.busy,modifier=Modifier.fillMaxWidth()){Text("تفعيل الاستقبال")}
-                        if(state.listening){Surface(color=Blue,shape=RoundedCornerShape(25.dp)){Column(Modifier.fillMaxWidth().padding(20.dp)){Text("العنوان اليدوي للمُرسل",fontWeight=FontWeight.Bold);controller.localAddresses().forEach{ip->SelectionContainerCompat("$ip:${state.port}")};if(controller.localAddresses().isEmpty())Text("لا يظهر عنوان Wi-Fi. اتصل بشبكة محلية أولًا.");Text("ستُطلب موافقتك عند وصول ملف.",fontSize=12.sp)}}
-                            OutlinedButton(onClick={controller.cancel()},modifier=Modifier.fillMaxWidth()){Text("إيقاف الاستقبال والنقل")}
-                        }
-                        Note("اختر مجلدًا محليًا فرعيًا مثل Documents/EZ. بعض إصدارات Android لا تسمح باختيار جذر Downloads. الملف الجزئي يحمل امتداد ezpart حتى ينجح التحقق؛ قد تبقى بقايا إذا رفض مزود التخزين حذفها.")
-                    }
-                    "result"->{
-                        Text(state.status,fontSize=24.sp,fontWeight=FontWeight.Bold)
-                        state.progress?.let{p->ProgressCard(p,state.filename)}
-                        if(state.busy)OutlinedButton(onClick={controller.cancel()},modifier=Modifier.fillMaxWidth()){Text("إلغاء النقل")}
-                        state.result?.let{r->Surface(color=Color(0xffe9f4ef),shape=RoundedCornerShape(25.dp)){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(r.metadata.name,fontWeight=FontWeight.Bold);Text("${humanSize(r.bytes)} · ${"%.2f".format(r.elapsedNanos/1e9)} ثانية");Text("متوسط فعلي: ${"%.2f".format(if(r.elapsedNanos>0)r.bytes/(r.elapsedNanos/1e9)/1e6 else 0.0)} MB/s");Text("SHA-256: ${r.sha256}",fontSize=10.sp);Text("تمت الكتابة والتحقق. ${if(r.savedAt.isNotEmpty())"تم حفظ الملف في المجلد المحدد." else "وصل إيصال التحقق من المستقبل."}",fontSize=12.sp)}}}
-                        if(state.result==null&&!state.busy)Note("لا توجد عملية ناجحة بعد. افتح إرسال أو استقبال للبدء؛ لا توجد أرقام أو ملفات وهمية.")
-                        Button(onClick={tab=0;controller.page("home")},modifier=Modifier.fillMaxWidth()){Text("العودة للرئيسية")}
-                    }
-                    "about"->{Text("EZ Alpha 0.1",fontSize=28.sp,fontWeight=FontWeight.Bold);Note("تطبيق Android أصلي لنقل ملف واحد على شبكة محلية. تشفير AES-GCM مع ECDH مؤقت ورمز مقارنة يدوي. البروتوكول جديد ويحتاج مراجعة أمنية واختبار هاتفين؛ ليست نسخة إصدار نهائي.");Note("Wi-Fi Direct وQR وتعدد الملفات والاستكمال والثيم الداكن ليست منفذة في Alpha. نموذج التصميم السابق يحتفظ برؤيتها فقط.");Text("لا حسابات ولا خادم سحابي. لا تُجمع ملفاتك أو تُرفع إلى الإنترنت.");OutlinedButton(onClick={controller.cancel();controller.stopDiscovery()}){Text("إيقاف جميع عمليات الشبكة")}}
-                }
-            }}
-            if(state.progress!=null&&state.stage!="result") {ProgressCard(state.progress!!,state.filename);TextButton(onClick={tab=2;controller.page("result")}){Text("عرض التفاصيل")}}
-            Spacer(Modifier.height(16.dp))
-        }
-    }}
-    state.request?.let{request->AlertDialog(onDismissRequest={controller.decide(false)},title={Text(if(request.incoming)"طلب استقبال ملف" else "تحقق من الهاتف الآخر")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Text("الجهاز: ${request.peer}");request.metadata?.let{Text(safeFilename(it.name));Text(if(it.size<0)"الحجم غير معروف · راقب مساحة التخزين" else humanSize(it.size))};Text("قارن الرمز نفسه على الهاتفين، ثم وافق فقط إذا كان متطابقًا.");Text(request.sas,fontSize=38.sp,fontWeight=FontWeight.Bold);Text("لا توافق اعتمادًا على الاسم أو IP وحدهما.",fontSize=12.sp)}},confirmButton={Button(onClick={controller.decide(true)}){Text(if(request.incoming)"الرمزان متطابقان · قبول الملف" else "الرمزان متطابقان · متابعة")}},dismissButton={TextButton(onClick={controller.decide(false)}){Text("رفض")}})}
+class EZViewModel(app:Application):AndroidViewModel(app){
+    val controller=(app as EZApplication).transfers;val ui=controller.ui
+    val catalog=FileCatalog(app)
+    init{catalog.refresh()}
+    private val store=EzLocalStore(app)
+    private val _preferences=MutableStateFlow(store.read());val preferences=_preferences.asStateFlow()
+    private val _history=MutableStateFlow(store.history());val history=_history.asStateFlow()
+    private val historyListener=android.content.SharedPreferences.OnSharedPreferenceChangeListener{_,key->if(key=="history")_history.value=store.history()}
+    init{store.observeHistory(historyListener)}
+    fun save(p:EzPreferences){store.save(p);_preferences.value=p}
+    override fun onCleared(){store.stopObservingHistory(historyListener);catalog.close();super.onCleared()}
+    fun clearHistory(){_history.value=emptyList();store.saveHistory(emptyList())}
 }
-@Composable private fun Note(text:String){Surface(color=Color(0xfff6f6f8),shape=RoundedCornerShape(22.dp)){Text(text,Modifier.fillMaxWidth().padding(16.dp),fontSize=12.sp,lineHeight=22.sp)}}
-@Composable private fun SelectionContainerCompat(text:String){androidx.compose.foundation.text.selection.SelectionContainer{Text(text,fontSize=20.sp,fontWeight=FontWeight.Bold)}}
-@Composable private fun ProgressCard(p:Progress,name:String){Surface(color=Color(0xfff3edff),shape=RoundedCornerShape(26.dp)){Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){if(name.isNotBlank())Text(name,fontWeight=FontWeight.Bold);if(p.percent==null)LinearProgressIndicator(Modifier.fillMaxWidth())else LinearProgressIndicator(progress={((p.percent?:0.0)/100).toFloat()},modifier=Modifier.fillMaxWidth());Text("${humanSize(p.bytes)} / ${if(p.total<0)"غير معروف" else humanSize(p.total)}");Text("${p.percent?.let{"%.1f%%".format(it)}?:"حجم غير معروف"} · ${"%.2f".format(p.currentMBps)} MB/s");Text("المتوسط: ${"%.2f".format(p.averageMBps)} MB/s · المتبقي: ${p.etaSeconds?.let{"%.0f ث".format(it)}?:"غير معروف"}",fontSize=12.sp);Text("السرعة محسوبة من بايتات فعلية وزمن monotonic، وليست وعد أداء.",fontSize=10.sp)}}}
-fun humanSize(bytes:Long):String=if(bytes>=1_000_000_000)"%.2f GB".format(bytes/1e9) else "%.2f MB".format(bytes/1e6)
+class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);enableEdgeToEdge();setContent{EZScreen()}}}
+@Composable fun EZScreen(vm:EZViewModel=viewModel()){
+    val state by vm.ui.collectAsStateWithLifecycle();val prefs by vm.preferences.collectAsStateWithLifecycle();val history by vm.history.collectAsStateWithLifecycle()
+    val controller=vm.controller;val context=LocalContext.current
+    var networkTick by remember{mutableIntStateOf(0)}
+    LaunchedEffect(state.listening){while(state.listening){kotlinx.coroutines.delay(2000);networkTick++}}
+    val addresses=remember(networkTick,state.port){controller.localAddresses()}
+    val catalog by vm.catalog.state.collectAsStateWithLifecycle()
+    val scope=rememberCoroutineScope()
+    fun message(s:String){Toast.makeText(context,s,Toast.LENGTH_LONG).show()}
+    var sharing by remember{mutableStateOf(false)}
+    fun launchShare(action:suspend ()->Unit){if(sharing){message("جارٍ تجهيز المشاركة؛ انتظر قليلًا");return};sharing=true;scope.launch{try{action()}catch(e:Exception){message(e.message?:"تعذّرت المشاركة")}finally{sharing=false}}}
+    fun toggle(file:LocalFile){if(controller.ui.value.busy)return;if(file.unavailable.isNotBlank()){message(file.unavailable);return};scope.launch{
+        try{val current=controller.ui.value.selected;val existing=current.firstOrNull{it.uri==file.uri||file.packageName.isNotBlank()&&it.uri.lastPathSegment?.startsWith(file.packageName+"-")==true}
+            if(existing!=null)controller.select(current-existing) else {val picked=if(file.packageName.isNotBlank())kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){val apk=ApkSharing.export(context,file.packageName);PickedFile(android.net.Uri.fromFile(apk),file.metadata.copy(size=apk.length()))} else PickedFile(file.uri,file.metadata);controller.select(controller.ui.value.selected+picked)}
+        }catch(e:Exception){message(e.message?:"تعذّر اختيار الملف")}
+    }}
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()){vm.catalog.import(it)}
+    val browseFolders=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()){it?.let(vm.catalog::openTree)}
+    val mediaPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){vm.catalog.refresh()}
+    val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){if(!it)Toast.makeText(context,"يمكن متابعة النقل؛ قد يُخفي النظام الإشعار",Toast.LENGTH_LONG).show()}
+    fun notifyPermission(){if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permission.launch(Manifest.permission.POST_NOTIFICATIONS)}
+    val dark=prefs.theme=="dark"||prefs.theme=="system"&&isSystemInDarkTheme()
+    DisposableEffect(dark){
+        (context as? ComponentActivity)?.enableEdgeToEdge(statusBarStyle=if(dark)SystemBarStyle.dark(android.graphics.Color.TRANSPARENT) else SystemBarStyle.light(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT),navigationBarStyle=if(dark)SystemBarStyle.dark(android.graphics.Color.TRANSPARENT) else SystemBarStyle.light(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT))
+        onDispose{}
+    }
+    val systemQuiet=runCatching{Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}.getOrDefault(false)
+    EzTheme(dark,prefs.quiet||systemQuiet){EzApp(state,prefs,history,addresses,
+        onPick={picker.launch(arrayOf("*/*"))},onDiscover=controller::startDiscovery,
+        onSend={notifyPermission();controller.send(it)},onReceive={notifyPermission();controller.receive()},onCancel=controller::cancel,onDecide=controller::decide,onSave=vm::save,onClearHistory=vm::clearHistory,onOpenReceived={openReceived(context,it,false)},onShareReceived={openReceived(context,it,true)},
+        catalog=catalog,onToggle=::toggle,onMany={files,select->
+            if(select){val combined=(state.selected+files.map{PickedFile(it.uri,it.metadata)}).distinctBy{it.uri};if(combined.size>256)message("حد العملية 256 ملفًا؛ قلّل التحديد") else scope.launch{try{val prepared=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){files.map{f->if(f.packageName.isBlank())PickedFile(f.uri,f.metadata) else {val apk=ApkSharing.export(context,f.packageName);PickedFile(android.net.Uri.fromFile(apk),f.metadata.copy(size=apk.length()))}}};controller.select((controller.ui.value.selected+prepared).distinctBy{it.uri})}catch(e:Exception){message(e.message?:"تعذّر تجهيز التطبيقات")}}}else controller.select(state.selected.filter{f->files.none{it.uri==f.uri||it.packageName.isNotBlank()&&f.uri.lastPathSegment?.startsWith(it.packageName+"-")==true}})
+        },onBrowseFolder={browseFolders.launch(null)},onMediaPermission={mediaPermission.launch(vm.catalog.permissions())},onCatalogRefresh=vm.catalog::refresh,onOpenDirectory=vm.catalog::open,onCatalogUp=vm.catalog::up,onDeviceFiles=vm.catalog::device,
+        permissionNote=vm.catalog.permissionNote(),onScan={notifyPermission();controller.scan(it)},
+        onPreview={f->runCatching{if(f.packageName.isNotBlank())message(f.unavailable.ifBlank{f.metadata.name+" · APK كامل قابل للمشاركة"}) else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(f.uri,f.metadata.mime).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))}.onFailure{message("لا يوجد تطبيق مناسب للمعاينة")}},
+        onShareApk={launchShare{message("جارٍ تجهيز APK كامل للمشاركة…");val apk=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){ApkSharing.export(context)};ApkSharing.share(context,apk)}},
+        onShareLink={launchShare{message("جارٍ التحقق من رابط الإصدار الرسمي…");val link=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){ApkSharing.officialLink(BuildConfig.VERSION_NAME)};context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT,link),"مشاركة رابط EZ"))}})}
+}
+fun humanSize(bytes:Long):String { val text=when{bytes<0->"غير معروف";bytes>=1_000_000_000->"%.2f GB".format(java.util.Locale.US,bytes/1e9);bytes>=1_000_000->"%.1f MB".format(java.util.Locale.US,bytes/1e6);bytes>=1000->"%.0f KB".format(java.util.Locale.US,bytes/1e3);else->"$bytes B"};return if(bytes<0)text else "\u2066$text\u2069"}

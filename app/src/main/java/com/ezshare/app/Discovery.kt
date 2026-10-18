@@ -18,7 +18,7 @@ class Discovery(context:Context,private val peers:(List<Peer>)->Unit,private val
         override fun onServiceUnregistered(info:NsdServiceInfo){}
         override fun onUnregistrationFailed(info:NsdServiceInfo,error:Int){}
     };registration=listener
-        try{nsd.registerService(NsdServiceInfo().apply{serviceName="EZ-${name.take(24)}";serviceType="_ezshare._tcp.";setPort(port);setAttribute("version","1")},NsdManager.PROTOCOL_DNS_SD,listener)}catch(_:Exception){status("الإعلان غير متاح؛ الاتصال اليدوي يعمل")}
+        try{nsd.registerService(NsdServiceInfo().apply{serviceName="EZ-${name.take(24)}";serviceType="_ezshare._tcp.";setPort(port);setAttribute("version","2")},NsdManager.PROTOCOL_DNS_SD,listener)}catch(_:Exception){status("الإعلان غير متاح؛ الاتصال اليدوي يعمل")}
     }
     fun discover(){stopDiscovery();found.clear();peers(emptyList());status("جارٍ البحث على شبكة Wi-Fi المحلية…")
         val listener=object:NsdManager.DiscoveryListener {

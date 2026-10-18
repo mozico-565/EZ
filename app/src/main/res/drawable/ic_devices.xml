@@ -1,0 +1,4 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+  <!-- The monitor contour ends behind the foreground phone, without intersecting strokes. -->
+  <path android:fillColor="@android:color/transparent" android:strokeColor="#FF111111" android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M14.5,17H4A2,2 0,0 1,2,15V5A2,2 0,0 1,4,3H17A2,2 0,0 1,19,5V7M9,17V20M7,20H12M17,8H21A2,2 0,0 1,23,10V20A2,2 0,0 1,21,22H17A2,2 0,0 1,15,20V10A2,2 0,0 1,17,8ZM18,11H20"/>
+</vector>

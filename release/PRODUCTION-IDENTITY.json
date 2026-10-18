@@ -1,0 +1,8 @@
+{
+  "certificate_sha256": "E8B79642B969337B9550DFB691994E1D90F52B438D3C8A82C4FCBB8048B3A908",
+  "alias": "ez-release",
+  "backup_run_id": "39137952284",
+  "backup_source_commit": "d3a80c71ae3501d4ba89c8ed478bbc66b899f64a",
+  "encrypted_backup_archive_sha256": "5ed8e0489cf15d1f8aada988820c232e14e57e797dcdd8bbc7ac97fb1ff983c5",
+  "private_material_included": false
+}

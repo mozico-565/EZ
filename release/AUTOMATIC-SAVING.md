@@ -1,0 +1,11 @@
+# Automatic receiving — Android 10+
+
+Receive starts the existing listener immediately. Explicit SAS comparison and acceptance on both peers still precede creation of any destination file. No receiving ACTION_OPEN_DOCUMENT_TREE, SAF tree permission or WRITE/MANAGE_EXTERNAL_STORAGE permission is used. The sender document browser retains its separately authorized read-folder picker.
+
+MediaStore.Downloads.EXTERNAL_CONTENT_URI inserts an app-owned row with RELATIVE_PATH Download/EZ/, original sanitized DISPLAY_NAME and MIME_TYPE, and IS_PENDING=1. MediaProvider creates the directory on first insertion and allocates a distinct file; existing files are never opened for writing. App-visible duplicate names receive (n) before the extension. Provider-level allocation also prevents overwrite of rows not visible under scoped storage. Actual provider display names are recorded in history.
+
+BatchEngine closes each bounded output and verifies declared size and wire SHA-256. Only then MediaStorePending reopens the stored bytes, compares SHA-256 and updates IS_PENDING=0. The verified receipt and completed history follow publication. Failed writes, cancellation or integrity failures invoke delete; if deletion fails the unpublished pending entry stays hidden and an error is surfaced, never success. Abrupt process death can leave an expiring pending MediaStore entry: no session recovery is claimed. Android MediaProvider owns expiration cleanup. Received files survive clearing EZ history.
+
+History ACTION_VIEW / ACTION_SEND use the saved content URI, detected MIME, ClipData and temporary read permission only. A deleted/unavailable file or missing handler gives a useful error. EZ does not silently install APKs or request unknown-source installation privileges.
+
+Automated acceptance is implemented in NativeStorageApkTest on emulator API29/API35: six file types including empty files, IS_PENDING publication, byte readback, duplicate preservation, cancellation cleanup, storage corruption, history URI actions, independent signed APK export, ordinary unsigned .apk transport and native Sharesheet launch. These are automated emulator tests, not two-physical-phone acceptance. See CI for actual outcomes.
