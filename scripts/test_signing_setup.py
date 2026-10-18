@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from prepare_signing_key import prepare
+from load_signing_backup import verify_backup
 
 
 class SigningSetupTest(unittest.TestCase):
@@ -47,6 +48,21 @@ class SigningSetupTest(unittest.TestCase):
             identity = json.loads((path / 'PUBLIC-IDENTITY.json').read_text())
             self.assertEqual(base64.b64decode((path / 'EZ_RELEASE_KEYSTORE_BASE64.txt').read_text(), validate=True), (path / 'EZ-production.p12').read_bytes())
             self.assertEqual(identity['certificate_sha256'], hashlib.sha256((path / 'certificate.der').read_bytes()).hexdigest().upper())
+            self.assertEqual(verify_backup(path, identity['certificate_sha256'], identity['source_commit']), (path / 'EZ-production.p12').read_bytes())
+            with self.assertRaises(ValueError):
+                verify_backup(path, '0' * 64, identity['source_commit'])
+            with self.assertRaises(ValueError):
+                verify_backup(path, identity['certificate_sha256'], 'another-source')
+            original = (path / 'EZ-production.p12').read_bytes()
+            (path / 'EZ-production.p12').write_bytes(original + b'tamper')
+            with self.assertRaises(ValueError):
+                verify_backup(path, identity['certificate_sha256'], identity['source_commit'])
+            (path / 'EZ-production.p12').write_bytes(original)
+            encoded = (path / 'EZ_RELEASE_KEYSTORE_BASE64.txt').read_bytes()
+            (path / 'EZ_RELEASE_KEYSTORE_BASE64.txt').write_text(base64.b64encode(b'wrong-backup').decode())
+            with self.assertRaises(ValueError):
+                verify_backup(path, identity['certificate_sha256'], identity['source_commit'])
+            (path / 'EZ_RELEASE_KEYSTORE_BASE64.txt').write_bytes(encoded)
             with self.assertRaises(FileExistsError):
                 prepare(path)
             # Verify the private entry is encrypted and cannot be opened with another password.
