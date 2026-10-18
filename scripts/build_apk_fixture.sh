@@ -9,7 +9,9 @@ keytool -genkeypair -keystore "$RUNNER_TEMP/apk-fixture/test.jks" -alias fixture
 "$bt/apksigner" sign --ks "$RUNNER_TEMP/apk-fixture/test.jks" --ks-pass pass:android --out "$RUNNER_TEMP/apk-fixture/fixture.apk" "$RUNNER_TEMP/apk-fixture/aligned.apk"
 "$bt/apksigner" verify "$RUNNER_TEMP/apk-fixture/fixture.apk"
 for kind in SplitBase SplitConfig; do
-  "$bt/aapt" package -f -M "scripts/apk-fixture/$kind.xml" -I "$ANDROID_HOME/platforms/android-35/android.jar" -F "$RUNNER_TEMP/apk-fixture/$kind-unsigned.apk"
+  mkdir -p "$RUNNER_TEMP/apk-fixture/$kind"
+  cp "scripts/apk-fixture/$kind.xml" "$RUNNER_TEMP/apk-fixture/$kind/AndroidManifest.xml"
+  "$bt/aapt" package -f -M "$RUNNER_TEMP/apk-fixture/$kind/AndroidManifest.xml" -I "$ANDROID_HOME/platforms/android-35/android.jar" -F "$RUNNER_TEMP/apk-fixture/$kind-unsigned.apk"
   "$bt/zipalign" -p -f 4 "$RUNNER_TEMP/apk-fixture/$kind-unsigned.apk" "$RUNNER_TEMP/apk-fixture/$kind-aligned.apk"
   "$bt/apksigner" sign --ks "$RUNNER_TEMP/apk-fixture/test.jks" --ks-pass pass:android --out "$RUNNER_TEMP/apk-fixture/$kind.apk" "$RUNNER_TEMP/apk-fixture/$kind-aligned.apk"
 done
