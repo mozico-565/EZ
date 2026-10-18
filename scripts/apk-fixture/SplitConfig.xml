@@ -1,0 +1,1 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.ezshare.fixture.split" split="config.ezfixture" android:versionCode="1" android:versionName="1.0"><uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35"/><application android:hasCode="false"/></manifest>

@@ -1,0 +1,18 @@
+{
+  "package_id": "com.ezshare.app",
+  "version_name": "1.0.0",
+  "debuggable": false,
+  "apk_sha256": "54ed700f3835bbacfdd4ee0082e3216fc0c9345708f19b89639c4c9d9c5babbb",
+  "certificate_sha256": "e8b79642b969337b9550dfb691994e1d90f52b438d3c8a82c4fcbb8048b3a908",
+  "source_commit": "8b183d07b9c660eedbb767399655f9397493207c",
+  "source_fingerprint": "bff6649102e2e3dd765cf4005393475f9b80a6423999d9c153b58125313cbfb1",
+  "version_code": 11,
+  "actions_run_id": 39158022188,
+  "core_tests": 26,
+  "android_compose_tests": 29,
+  "signing_setup_tests": 4,
+  "release_gate_tests": 2,
+  "api29_instrumentation_tests": 8,
+  "api35_instrumentation_tests": 8,
+  "physical_two_phone_tests": "owner_waived_not_performed"
+}
