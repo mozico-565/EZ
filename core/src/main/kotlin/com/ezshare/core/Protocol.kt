@@ -66,9 +66,9 @@ class Connection(val socket: Socket, private val idleMillis: Long = 30_000) : Cl
     override fun close() { cancelled.set(true); runCatching { socket.close() }; watchdog.shutdownNow() }
 }
 /** Authenticated-encryption records. Pair authenticity requires the users to compare SAS and approve on both devices. */
-class SecureChannel(private val connection: Connection, sender: Boolean, deviceName: String) {
+class SecureChannel(private val connection: Connection, sender: Boolean, deviceName: String, protocolVersion:Int=1) {
     private val input = DataInputStream(BufferedInputStream(connection.socket.getInputStream(), 64 * 1024))
-    private val output = DataOutputStream(BufferedOutputStream(connection.socket.getOutputStream(), 64 * 1024))
+    private val output = DataOutputStream(BufferedOutputStream(connection.socket.getOutputStream(), if(protocolVersion==2)256 * 1024 else 64 * 1024))
     private val txKey: SecretKeySpec; private val rxKey: SecretKeySpec
     private var txSeq = 0L; private var rxSeq = 0L
     val peerName: String; val sas: String
@@ -77,8 +77,8 @@ class SecureChannel(private val connection: Connection, sender: Boolean, deviceN
         val pair = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
         val nonce = ByteArray(32).also { SecureRandom().nextBytes(it) }
         val pub = pair.public.encoded
-        output.writeInt(0x455A0001); output.writeBoolean(sender); output.writeBounded(pub, 1024); output.writeBounded(nonce,32); output.writeText(localName,192); output.flush()
-        requireProtocol(input.readInt()==0x455A0001,"Unsupported protocol")
+        output.writeInt(0x455A0000 or protocolVersion); output.writeBoolean(sender); output.writeBounded(pub, 1024); output.writeBounded(nonce,32); output.writeText(localName,192); output.flush()
+        requireProtocol(input.readInt()==(0x455A0000 or protocolVersion),"Unsupported protocol")
         requireProtocol(input.readBoolean()!=sender,"Roles conflict")
         val remotePub=input.readBounded(1024); val remoteNonce=input.readBounded(32); requireProtocol(remoteNonce.size==32,"Invalid nonce")
         peerName=input.readText(192).also { requireProtocol(it.isNotBlank() && it.none(Char::isISOControl),"Invalid device name") }
@@ -87,7 +87,7 @@ class SecureChannel(private val connection: Connection, sender: Boolean, deviceN
         requireProtocol(remote.params.order==localParams.order && remote.params.curve==localParams.curve,"Unsupported EC parameters")
         val agreement=KeyAgreement.getInstance("ECDH");agreement.init(pair.private);agreement.doPhase(remote,true)
         val transcript=ByteArrayOutputStream().also { b -> DataOutputStream(b).use { d ->
-            d.writeText("EZ-ALPHA-1",32)
+            d.writeText(if(protocolVersion==1)"EZ-ALPHA-1" else "EZ-BATCH-2",32)
             if(sender){d.writeBounded(pub,1024);d.writeBounded(nonce,32);d.writeText(localName,192);d.writeBounded(remotePub,1024);d.writeBounded(remoteNonce,32);d.writeText(peerName,192)}
             else {d.writeBounded(remotePub,1024);d.writeBounded(remoteNonce,32);d.writeText(peerName,192);d.writeBounded(pub,1024);d.writeBounded(nonce,32);d.writeText(localName,192)}
         }}.toByteArray()
@@ -99,9 +99,9 @@ class SecureChannel(private val connection: Connection, sender: Boolean, deviceN
         val sasBytes=hmac(prk,"EZ SAS".toByteArray());val code=(java.nio.ByteBuffer.wrap(sasBytes).int.toLong() and 0xffffffffL)%1_000_000
         sas=String.format(java.util.Locale.ROOT,"%06d",code);connection.touch()
     }
-    fun send(bytes: ByteArray) { requireProtocol(bytes.size<=65537,"Record too large");checkSequence(txSeq)
+    fun send(bytes: ByteArray, flush:Boolean=true) { requireProtocol(bytes.size<=65537,"Record too large");checkSequence(txSeq)
         val encrypted=crypt(Cipher.ENCRYPT_MODE,txKey,txSeq++,bytes)
-        output.writeInt(encrypted.size);output.write(encrypted);output.flush();connection.touch()
+        output.writeInt(encrypted.size);output.write(encrypted);if(flush)output.flush();connection.touch()
     }
     fun receive(): ByteArray { checkSequence(rxSeq);val length=input.readInt();requireProtocol(length in 17..65553,"Invalid record length")
         val bytes=ByteArray(length);input.readFully(bytes);val result=crypt(Cipher.DECRYPT_MODE,rxKey,rxSeq++,bytes);connection.touch();return result
