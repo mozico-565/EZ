@@ -17,6 +17,12 @@ class ReleaseGateTest(unittest.TestCase):
                 self.assertTrue(verify(evidence,metadata,apk))
                 for change in ({'apk_sha256':'0'*64},{'source_fingerprint':'0'*64},{'certificate_sha256':'0'*64},{'completed':False},{'results':{}}):
                     with self.assertRaises(AssertionError):verify(evidence|change,metadata,apk)
+                waiver={'approved':True,'scope':'physical_two_device_acceptance','approved_by':'repository owner','recorded_at':'2026-10-18','instruction':'انشى الريليس بعد اكتماله وبدون اختبار النقل بين جهازين'}
+                waived=evidence|{'completed':False,'devices':[],'results':dict.fromkeys(required,'not_tested'),'owner_waiver':waiver}
+                self.assertTrue(verify(waived,metadata,apk))
+                for change in ({'approved':False},{'scope':'all_tests'},{'instruction':''}):
+                    with self.assertRaises(AssertionError):verify(waived|{'owner_waiver':waiver|change},metadata,apk)
+                with self.assertRaises(AssertionError):verify(waived|{'completed':True},metadata,apk)
                 with self.assertRaises(AssertionError):verify(evidence,metadata|{'debuggable':True},apk)
                 apk.write_bytes(b'changed binary')
                 with self.assertRaises(AssertionError):verify(evidence,metadata,apk)
