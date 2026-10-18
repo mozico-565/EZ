@@ -62,7 +62,9 @@ class NativeStorageApkTest {
             assertNotNull(root)
             assertTrue("Actual Android chooser must be foreground",root!!.packageName.toString() in listOf("android","com.android.intentresolver"))
             val capture=automation.takeScreenshot();assertNotNull(capture)
-            File(context.getExternalFilesDir(null),"native-apk-sharesheet.png").outputStream().use{capture.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
+            // Shared test evidence survives AGP uninstalling the target after tests.
+            val evidence=MediaStorePending(context,Metadata("native-apk-sharesheet.png","image/png",-1))
+            try{evidence.output.use{check(capture.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))};evidence.commit()}catch(e:Exception){evidence.abort();throw e}
             automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
         }finally{instrumentation.runOnMainSync{activity.finish()}}
     }
