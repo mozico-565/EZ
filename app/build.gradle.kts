@@ -2,7 +2,7 @@ plugins { id("com.android.application"); kotlin("android"); id("org.jetbrains.ko
 android {
     namespace = "com.ezshare.app"
     compileSdk = 35
-    defaultConfig { applicationId = "com.ezshare.app"; minSdk = 29; targetSdk = 35; versionCode = 10; versionName = "1.0.0" }
+    defaultConfig { applicationId = "com.ezshare.app"; minSdk = 29; targetSdk = 35; versionCode = 11; versionName = "1.0.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true; unitTests.all { it.systemProperty("roborazzi.test.record", "true"); it.maxHeapSize = "2g" } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -31,6 +31,8 @@ android {
     }
 }
 dependencies {
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     implementation(project(":core"))
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
