@@ -1,58 +1,38 @@
-# EZ Alpha 0.1
+# EZ 1.0.0 release work
 
-Native Kotlin / Jetpack Compose Android application. Arabic RTL, Android 10+ (API29), compile/target35. **Alpha: awaiting two-physical-phone testing and independent security review.** No WebView, cloud transfer, account, or paid backend.
+Existing native Kotlin/Jetpack Compose project continued from PR2, not rebuilt. App ID`com.ezshare.app`, Android10+, Arabic RTL, approved pastel identity and fixed floating capsule/scroll behavior. Source version1.0.0/versionCode10 is **not a published stable release**. Production signing credentials and the physical two-phone acceptance matrix are still required. No Alpha APK is being offered as an official release.
 
-## Implemented
-Single real SAF-selected file → local TCP connection (NSD discovery + manual private IPv4:port fallback) → ephemeral P-256 ECDH and AES-256-GCM records → six-digit SAS comparison and explicit approval on both phones → 64KiB bounded streaming → receiver writes `.ezpart-*` → verifies stream SHA-256 and length → closes and re-reads saved bytes for SHA-256 verification → renames document → sends verified receipt → sender reports success.
+## Implemented in this branch
 
-Progress and MB/s use real stream bytes and monotonic nanoseconds; speeds are not benchmarks. Known/unknown lengths, duplicate names, bounded metadata, 16GiB safety cap, timeouts, cancellation, errors and partial cleanup are implemented. Notification foreground service covers active transfers/receive mode. Long file streams are never loaded into RAM.
+- Real in-app MediaStore media browser (photos, videos, audio), visible launcher apps, authorized SAF document folders and imported documents.7categories, search, sorting, dates/duration, thumbnails, list/grid, persistent selection across tabs, batch summary. Android permissions are contextual and scoped; partial photo access is respected. No MANAGE_EXTERNAL_STORAGE or QUERY_ALL_PACKAGES.
+- Complete standalone APK export validated against installed package/version/certificate, narrow FileProvider URI, temporary read grant and Android Sharesheet for Bluetooth/Quick Share/other targets. Split apps are explicitly limited, never base-only 'installable' exports. Official links are verified against an actual published release; no Play Store URL/token is invented.
+- CameraX + ZXing on-device QR scanning (no GMS/model download/ML SDK dependency). Receiver generates a live local address/port, version2, short-lived nonce and expiry. Sender strictly validates scheme/fields/local IPv4/port/expiry. Both users must still compare SAS and explicitly approve.
+- Protocol2 multi-file encrypted sessions: one manifest and key exchange, per-file SHA-256/storage readback/receipt, overall and per-file progress, completed-file history, duplicate-safe names, cancellation and honest failed/partial states. Max256files/session and16GiB/file; memory is bounded, not whole-file buffering.
+- Connection/discovery/approval/first-chunk/streaming/storage-verification/receipt timing. Actual MB/s from monotonic byte deltas; synthetic loopback results are not phone benchmarks.
+- Transparent/themed header mark, unchanged adaptive launcher safe zones, corrected monitor/phone contour, light/dark/large-font support, local identity/preferences/history and existing motion/reduced-motion behavior.
 
-## Quick test on two phones
-1. Download `EZ-Alpha-0.1-debug` artifact from a successful Actions run, unzip, install `app-debug.apk` on both devices. Allow that download source to install this APK when Android asks. Do not disable Play Protect globally.
-2. Join the same Wi-Fi (internet unnecessary), or connect one phone to the other's hotspot. Some routers/hotspots isolate clients; try another private Wi-Fi if connection fails.
-3. Receiver: **استقبال** → choose a local subfolder such as Documents/EZ with Android's directory picker → **تفعيل الاستقبال**. Keep receive mode running. The app shows its private IP and dynamic TCP port.
-4. Sender: **إرسال** → choose real file → **البحث عن مستقبلين** and select device, or enter receiver `192.168.x.x:port` → connect.
-5. Compare the identical six digits on both physical screens. Accept on both only when they match. Reject if they differ or the peer is unexpected.
-6. Observe actual progress. Receiver success requires written length + SHA-256 and document rename; sender success requires receiver's matching receipt. Check received file opens and its contents match.
-7. Stop receive mode when finished. Cancel notification or in-app controls close sockets. No pause/resume in Alpha.
+## Workflows and release gates
 
-## Builds and tests
-JDK17, Android SDK35/build-tools35.0.0. Stable pinned dependency versions: Gradle8.11.1, AGP8.9.2, Kotlin/Compose compiler2.1.20, Compose BOM2025.04.01.
+Ordinary CI uses contents:read, tests core and Android UI/security fixtures, checks debug/release lint and assembles a **non-debug unsigned release artifact**, explicitly named NOT-INSTALLABLE. It is validation evidence, not an installable release.
 
-```sh
-./gradlew :core:test :app:lintDebug :app:assembleDebug
-```
-Debug output: `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs tests/lint/build on push, PR and manual dispatch; artifacts appear at the bottom of each successful run for signed-in repo members, expire after14days. Debug signing is automatic and unsuitable for production release.
+Manual dispatch of the existing Android validation workflow additionally runs a **production-signed candidate** job. It refuses missing credentials, verifies certificate/package/version/non-debug status and uploads APK/checksum/metadata for phone acceptance. No private key is committed or printed. See [signing setup](release/SIGNING-SETUP.md).
 
-## Layout
-- `core/`: pure Kotlin JVM crypto records, metadata, transport, integrity and speed.
-- `app/`: Compose, ViewModel, app-owned transfer controller, NSD, SAF sink, foreground service.
-- `core/src/test/`: real TCP loopback integration and unit/error tests.
-- `.github/workflows/android.yml`: build, reports and debug artifact.
+Stable publishing uses `.github/workflows/release.yml` only after owner-recorded [physical acceptance](release/PHYSICAL-TESTING.md), matching exact APK hash/source fingerprint/certificate/approved commit. It publishes that same tested artifact, without a new rebuild or tag overwrite. No v1.0.0 tag/release is created while gates are unmet.
 
-`EZ-Alpha-Source.zip` in the repository is a historical bootstrap checkpoint, not the current source. CI expanded the tested source into the normal directories. Current canonical source is `app/`, `core/` and the Gradle files. The one-time write-permission materialization job has been removed; ordinary CI now has read-only repository permissions. Fresh branch builds cancel superseded runs and cache Gradle dependencies.
+## Transfer flow
 
-## Limitations / do not overclaim
-- No two-phone validation yet; loopback tests are not a device-network benchmark.
-- New custom pairing protocol, not independently audited or release-ready. SAS requires careful human comparison. Metadata (filename/length) is encrypted but shared with the selected peer before final approval; file contents wait for both approvals.
-- NSD resolution can fail/busy on some Android versions; manual private IPv4 fallback is required and supported. IPv6 and public IP connections not implemented.
-- SAF providers must support creation, write, delete and rename. Use local Documents/EZ, not a cloud provider; offline save capability depends on provider. Available capacity is not claimed for opaque SAF providers; I/O errors fail the transfer. Partial cleanup is best effort; manually delete `.ezpart-*` after an unclean process death or provider deletion failure.
-- Final receipt loss can cause sender failure although receiver has a verified saved file. Inspect receiver before retrying; duplicate names are not overwritten.
-- Cancellation/timeouts close sockets, but a hostile/broken document provider can block its own I/O. Android may kill the process; no resume/recovery. Background/foreground behavior needs testing across OEMs.
-- Active receive mode needs foreground-service lifetime and can reach system time limits; stop when not needed. Notification denial does not imply broad file permissions.
-- Active transfer state does not persist across process death. Completed/failed session history and appearance preferences persist locally. Destination access can be persisted by SAF, but this Alpha chooses it in the current session.
-- Wi-Fi Direct, QR, multi-file, pause/resume and app sharing remain roadmap only. History, avatars and appearance preferences are implemented in the design correction. The earlier HTML design prototype is not the transfer engine.
+Both phones use compatible protocol2 and the same local router/hotspot (internet is unnecessary for file transfer). Receiver chooses a local subfolder such as Documents/EZ and starts Receive. Sender selects actual files, discovers/chooses receiver or scans its QR/manual IP:PORT. Compare the same six digits and approve both sides. Receiver verifies stored data before publication/receipt; sender requires the verified receipt. Camera and OEM background behavior still need actual device testing.
 
-## Troubleshooting
-No peers: manual IP/port and recheck same subnet, AP isolation, VPN, firewall. Timeout: compare/approve before120s and ensure receiver foreground. Unknown file size: percentage/ETA can be unknown until final count. No save: choose local subfolder, verify capacity, try another provider. Hash mismatch/incomplete connection: no successful result; retry as new transfer. No broad storage permission or MANAGE_EXTERNAL_STORAGE is used.
+## Limits and honest failures
 
-See `TESTING.md` for required measurements and `SECURITY.md` for protocol details.
+- No physical two-phone acceptance or audited-security claim yet. Six-digit SAS requires careful human comparison; names/IP/QR alone are not authentication. See SECURITY.md.
+- Old Alpha protocol1 fails closed with a compatibility message; update both peers. Production signing differs from old ephemeral debug keys, so keep important app data before uninstall/reinstall. Future production updates must retain the persistent key.
+- NSD can fail or be blocked by AP isolation/VPN/OEM behavior; private IPv4 manual fallback remains. IPv6, Wi-Fi Direct, auto-trust, pause/resume and recovery after process death are not implemented.
+- Scoped storage cannot enumerate every document without authorization. Non-launcher apps may not be visible; split packages need a complete distributable from a trusted source. SAF provider must support local create/read/write/delete/rename. Capacity for an opaque provider is not fabricated.
+- Earlier verified files survive a later interruption. A failed current partial is not marked successful; failed deletion warns about possible `.ezpart`. Process death can leave partial documents. Receipt loss after verified publication can cause sender failure despite a valid receiver file; inspect receiver before retry.
+- Selection and active transfer are in memory; completed/failed file history (up to100) and appearance/device preferences persist locally. Clearing history never deletes files. Foreground service and notification behavior require OEM testing.
+- The repo currently displays Public in GitHub. A published official download link still does not exist merely because source is public; the app verifies a real non-prerelease Release before sharing. This task did not change repository visibility.
 
-## Native design correction 0.1.1
-VersionCode2 keeps package com.ezshare.app and the existing transfer engine. Source-faithful home, files/send, receive, discovery, confirmation, progress, history/detail, settings, optional dark theme and shared components replace the Alpha UI shortcuts. Adaptive launcher and monochrome icons preserve the approved mark. See design/REFERENCE.md for the screen comparison, tokens, motion, honest Alpha deviations and visual verification limits.
+## Evidence
 
-Search/category filters apply to the single SAF-selected file. History stores up to100 actual session records locally and clearing it never deletes documents. Name/avatar/theme/reduced-motion preferences persist. QR, pause/resume and app sharing remain clearly labelled coming soon.
-
-UI screenshot tests use native Robolectric/Roborazzi; CI artifacts include EZ-native-design-captures. They are generated Android renders, not physical-device screenshots or approved HTML pixel goldens. Run `./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
-
-Upgrade note: package and versionCode preserve the Android upgrade path, but the initial CI debug keystore was ephemeral. If Android reports signature mismatch, Android cannot upgrade it in-place without the prior signing key. This build does not silently uninstall data or change package ID. Export received files first and make an explicit user decision before uninstalling. CI now uses an explicit development debug key path and attempts cache reuse. Cache scope/eviction can still change that identity; production and reliable cross-branch updates require a stable user-managed signing key. No private signing key is committed.
+[Release status](release/STATUS.md), [performance](release/PERFORMANCE.md), [phone matrix](release/PHYSICAL-TESTING.md), [signing setup](release/SIGNING-SETUP.md), original design tokens/motion in`design/REFERENCE.md`. Historical0.1.1 validation is retained as history, not proof of this release.

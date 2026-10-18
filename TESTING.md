@@ -1,3 +1,7 @@
+# Current release acceptance
+
+See release/PHYSICAL-TESTING.md and release/PHYSICAL-ACCEPTANCE.json for1.0.0. Historical Alpha checks below remain context, not current release evidence.
+
 # Two-phone validation — required, not performed remotely
 
 Record both models, Android versions, APK run/commit, Wi-Fi band/router or hotspot, approximate distance and free destination capacity. Android14/15 are useful targets; exact models are unknown.
