@@ -27,17 +27,16 @@ object BatchEngine {
         m.files.forEachIndexed{i,meta->
             c.transferWindow();val meter=ProgressMeter(meta.size);val begin=System.nanoTime();val digest=MessageDigest.getInstance("SHA-256");var count=0L;var last=0L
             sources[i]().use{input->val buffer=ByteArray(64*1024+1);buffer[0]=3
-                while(true){if(c.cancelled.get())throw IOException("Cancelled");val n=input.read(buffer,1,buffer.size-1);if(n<0)break;if(n==0)continue;count+=n;requireProtocol(count<=Metadata.MAX_BYTES&&(meta.size<0||count<=meta.size),"Source length changed");digest.update(buffer,1,n);ch.send(buffer.copyOf(n+1),false)
+                while(true){if(c.cancelled.get())throw IOException("Cancelled");val n=input.read(buffer,1,buffer.size-1);if(n<0)break;if(n==0)continue;count+=n;requireProtocol(count<=Metadata.MAX_BYTES&&(meta.size<0||count<=meta.size),"Source length changed");digest.update(buffer,1,n);ch.send(buffer.copyOf(n+1),count==n.toLong());if(count==n.toLong())times+=PhaseTiming("first_wire_chunk",i,System.nanoTime()-begin)
                     val now=System.nanoTime();if(now-last>=150_000_000){val p=meter.sample(count);onProgress(BatchProgress(p.copy(bytes=completedBytes+count,total=m.total,elapsedNanos=streamingNanos+p.elapsedNanos),i,m.files.size,meta.name,i,"streaming"));last=now}
                 }
             }
-            requireProtocol(meta.size<0||count==meta.size,"Source truncated");val streamTime=System.nanoTime()-begin;streamingNanos+=streamTime;times+=PhaseTiming("streaming",i,streamTime);val hash=digest.digest()
-            ch.send(encode(4){it.writeLong(count);it.write(hash)});c.approvalWindow();onProgress(BatchProgress(Progress(completedBytes+count,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i,"verifying"))
+            requireProtocol(meta.size<0||count==meta.size,"Source truncated");val hash=digest.digest();ch.send(encode(4){it.writeLong(count);it.write(hash)});val streamTime=System.nanoTime()-begin;streamingNanos+=streamTime;times+=PhaseTiming("streaming",i,streamTime);c.approvalWindow();onProgress(BatchProgress(Progress(completedBytes+count,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i,"verifying"))
             val receiptStart=System.nanoTime();val ack=DataInputStream(ByteArrayInputStream(ch.receive()));requireProtocol(ack.readUnsignedByte()==5&&ack.readLong()==count,"No verified receipt");val remote=ByteArray(32);ack.readFully(remote);requireProtocol(ack.available()==0&&MessageDigest.isEqual(hash,remote),"Receipt hash mismatch");times+=PhaseTiming("receipt_and_remote_verification",i,System.nanoTime()-receiptStart)
             val r=Result(meta,count,hash.hex(),streamTime);results+=r;onComplete(r);completedBytes+=count
             onProgress(BatchProgress(Progress(completedBytes,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i+1,"verified"))
         }
-        return BatchResult(m.session,results,times,System.nanoTime()-start)
+        return BatchResult(m.session,results,times+PhaseTiming("total_session",-1,System.nanoTime()-start),System.nanoTime()-start)
     }
     fun receive(c:Connection,name:String,expectedNonce:String="",approve:(Manifest,String,String)->Boolean,create:(Metadata)->PendingFile,onProgress:(BatchProgress)->Unit={},onComplete:(Result)->Unit={}):BatchResult {
         val start=System.nanoTime();val times=mutableListOf<PhaseTiming>();val results=mutableListOf<Result>();val hs=System.nanoTime();val ch=SecureChannel(c,false,name,2);times+=PhaseTiming("handshake",-1,System.nanoTime()-hs);c.approvalWindow();val m=manifest(ch.receive())
@@ -50,7 +49,7 @@ object BatchEngine {
                 if(i==0)ch.send(byteArrayOf(2));c.transferWindow();val meter=ProgressMeter(meta.size);val begin=System.nanoTime();val digest=MessageDigest.getInstance("SHA-256");var count=0L;var last=0L;var hash=ByteArray(0);var writeNanos=0L
                 pending.output.use{out->while(true){if(c.cancelled.get())throw IOException("Cancelled");val frame=ch.receive();requireProtocol(frame.isNotEmpty(),"Empty record")
                     when(frame[0].toInt()){
-                        3->{val n=frame.size-1;requireProtocol(n>0,"Empty chunk");count+=n;requireProtocol(count<=Metadata.MAX_BYTES&&(meta.size<0||count<=meta.size),"Unexpected file size");val w=System.nanoTime();out.write(frame,1,n);writeNanos+=System.nanoTime()-w;digest.update(frame,1,n);val now=System.nanoTime();if(now-last>=150_000_000){val p=meter.sample(count);onProgress(BatchProgress(p.copy(bytes=completedBytes+count,total=m.total,elapsedNanos=streamingNanos+p.elapsedNanos),i,m.files.size,meta.name,i,"streaming"));last=now}}
+                        3->{val n=frame.size-1;requireProtocol(n>0,"Empty chunk");count+=n;requireProtocol(count<=Metadata.MAX_BYTES&&(meta.size<0||count<=meta.size),"Unexpected file size");if(count==n.toLong())times+=PhaseTiming("first_wire_chunk",i,System.nanoTime()-begin);val w=System.nanoTime();out.write(frame,1,n);writeNanos+=System.nanoTime()-w;digest.update(frame,1,n);val now=System.nanoTime();if(now-last>=150_000_000){val p=meter.sample(count);onProgress(BatchProgress(p.copy(bytes=completedBytes+count,total=m.total,elapsedNanos=streamingNanos+p.elapsedNanos),i,m.files.size,meta.name,i,"streaming"));last=now}}
                         4->{requireProtocol(frame.size==41,"Invalid end record");val end=DataInputStream(ByteArrayInputStream(frame,1,40));val declared=end.readLong();val expected=ByteArray(32);end.readFully(expected);hash=digest.digest();requireProtocol(count==declared&&(meta.size<0||meta.size==count),"Truncated file");requireProtocol(MessageDigest.isEqual(hash,expected),"SHA-256 mismatch");out.flush();break}
                         else->throw ProtocolException("Unexpected frame")
                     }
@@ -62,7 +61,7 @@ object BatchEngine {
                 onProgress(BatchProgress(Progress(completedBytes,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i+1,"verified"))
             }finally{if(!committed){runCatching{pending.output.close()};runCatching{pending.abort()}}}
         }
-        return BatchResult(m.session,results,times,System.nanoTime()-start)
+        return BatchResult(m.session,results,times+PhaseTiming("total_session",-1,System.nanoTime()-start),System.nanoTime()-start)
     }
     private fun ByteArray.hex()=joinToString(""){"%02x".format(it.toInt() and 255)}
 }
