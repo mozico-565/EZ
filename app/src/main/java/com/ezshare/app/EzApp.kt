@@ -34,9 +34,11 @@ import java.util.Locale
 @Composable fun EzApp(
     state:TransferUi,prefs:EzPreferences,history:List<HistoryEntry>,addresses:List<String>,
     onPick:()->Unit={},onFolder:()->Unit={},onDiscover:()->Unit={},onSend:(String)->Unit={},onReceive:()->Unit={},onCancel:()->Unit={},onDecide:(Boolean)->Unit={},onSave:(EzPreferences)->Unit={},onClearHistory:()->Unit={},
-    initialDestination:String="home",initialSheet:String=""
+    initialDestination:String="home",initialSheet:String="",
+    catalog:CatalogState=CatalogState(),onToggle:(LocalFile)->Unit={},onMany:(List<LocalFile>,Boolean)->Unit={_,_->},onBrowseFolder:()->Unit={},onMediaPermission:()->Unit={},onCatalogRefresh:()->Unit={},onOpenDirectory:(LocalFile)->Unit={},onCatalogUp:()->Unit={},onDeviceFiles:()->Unit={},onPreview:(LocalFile)->Unit={},permissionNote:String="يعرض الملفات المسموح بها فقط.",onScan:(com.ezshare.core.PairingQr)->Unit={},onShareApk:()->Unit={},onShareLink:()->Unit={}
 ){
     val p=LocalEzPalette.current;val quiet=LocalEzQuiet.current
+    val chosen=state.selected.ifEmpty{listOfNotNull(state.picked)}
     var screen by rememberSaveable{mutableStateOf(initialDestination)};var sheet by rememberSaveable{mutableStateOf(initialSheet)}
     var category by rememberSaveable{mutableStateOf("الكل")};var query by rememberSaveable{mutableStateOf("")};var selected by rememberSaveable{mutableStateOf(true)}
     var sort by rememberSaveable{mutableStateOf("الاسم")};var descending by rememberSaveable{mutableStateOf(false)};var address by rememberSaveable{mutableStateOf("")}
@@ -47,7 +49,7 @@ import java.util.Locale
     fun openFiles(c:String="الكل"){category=c;route("files")}
     fun back(){if(state.request!=null)onDecide(false);route(when(screen){"discover","scanner","confirm"->if(state.incoming)"receive" else "files";"detail"->"history";else->"home"})}
     BackHandler(screen!="home"||sheet.isNotEmpty()){if(sheet.isNotEmpty())sheet="" else back()}
-    LaunchedEffect(state.picked){if(state.picked!=null){selected=true;if(screen!="home")screen="files"}}
+    LaunchedEffect(state.picked){if(chosen.isNotEmpty()){selected=true;if(screen!="home")screen="files"}}
     LaunchedEffect(state.request){if(state.request!=null)screen="confirm"}
     LaunchedEffect(state.stage){if(state.stage=="transfer"||state.stage=="result")screen="transfer"}
     val tab=when(screen){"files","discover","scanner"->1;"history","detail","transfer"->2;"settings"->3;else->0}
@@ -56,7 +58,7 @@ import java.util.Locale
     Box(Modifier.fillMaxSize().background(p.background).testTag("ez-screen")){
         Column(Modifier.fillMaxSize().padding(top=maxOf(64.dp,top+8.dp))){
             Row(Modifier.fillMaxWidth().padding(horizontal=24.dp).height(60.dp*LocalDensity.current.fontScale.coerceAtLeast(1f)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                Image(painterResource(R.drawable.ez_logo),"شعار EZ",Modifier.width(52.dp).height(28.dp).clip(RoundedCornerShape(5.dp)).background(Color.White),contentScale=ContentScale.Fit)
+                Image(painterResource(if(p.dark)R.drawable.ez_header_dark else R.drawable.ez_header_light),"شعار EZ",Modifier.width(52.dp).height(28.dp),contentScale=ContentScale.Fit)
                 Column(Modifier.weight(1f)){Text("قريبين، حتى بدون إنترنت",fontSize=9.sp,color=p.muted,lineHeight=16.sp,maxLines=1);Text(pageTitle,fontSize=12.sp,fontWeight=FontWeight.SemiBold,lineHeight=20.sp,maxLines=2)}
                 if(screen=="home")EzRound(R.drawable.ic_share_network,"مشاركة تطبيق EZ",{sheet="share"},true)
                 EzRound(if(screen in listOf("home","history","settings"))R.drawable.ic_gear_six else R.drawable.ic_arrow_right,if(screen in listOf("home","history","settings"))"الإعدادات" else "رجوع",{if(screen in listOf("home","history","settings"))route("settings") else back()})
@@ -68,38 +70,25 @@ import java.util.Locale
                     when(page){
                         "home"->{
                             HomeContent(onFiles={openFiles(it)},onReceive={route("receive")},onPrivacy={sheet="privacy"},latest=history.firstOrNull(),onHistory={route("history")})
-                            Text("Alpha 0.1.1 · نقل ملف حقيقي عبر شبكة محلية",Modifier.fillMaxWidth().padding(top=18.dp),textAlign=TextAlign.Center,fontSize=9.sp,color=p.muted)
+                            Text("EZ · نقل محلي مشفّر · موافقتك أولًا",Modifier.fillMaxWidth().padding(top=18.dp),textAlign=TextAlign.Center,fontSize=9.sp,color=p.muted)
                         }
                         "files"->{
-                            EzBadge("ملفاتك المختارة · من جهازك")
-                            Text("أشياء تستحق\nالمشاركة.",style=MaterialTheme.typography.headlineLarge)
-                            Spacer(Modifier.height(20.dp));StorageSummary()
-                            SearchField(query,{query=it},"ابحث في الملفات المختارة")
-                            FlowRow(Modifier.padding(vertical=16.dp),horizontalArrangement=Arrangement.spacedBy(5.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){(listOf("الكل")+categories.map{it.label}+"ملفات أخرى").forEach{c->FilterChip(c,c==category,{category=c})}}
-                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){Row(verticalAlignment=Alignment.CenterVertically){Text("ترتيب حسب",fontSize=11.sp);Spacer(Modifier.width(6.dp));ChoiceMenu(sort,listOf("الاسم","الحجم","التاريخ")){sort=it}};TextButton(onClick={descending=!descending}){Text(if(descending)"تنازلي ↓" else "تصاعدي ↑",fontSize=11.sp)}}
-                            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){TextButton(onClick={selected=!selected},enabled=state.picked!=null){Text(if(selected&&state.picked!=null)"إلغاء تحديد الظاهر" else "تحديد كل الظاهر",fontSize=12.sp)};Text("${if(selected&&state.picked!=null)1 else 0} محدد · ${if(selected)humanSize(state.picked?.metadata?.size?:0) else "0 B"}",fontSize=11.sp)}
-                            val file=state.picked
-                            if(file!=null&&file.metadata.name.contains(query.trim(),true)&&(category=="الكل"||fileCategory(file.metadata.mime,file.metadata.name)==category)){
-                                FileRow(file.metadata.name,humanSize(file.metadata.size),fileIcon(fileCategory(file.metadata.mime,file.metadata.name)),selected,{selected=!selected})
-                            }else EzEmpty(if(query.isNotBlank())"لا توجد نتائج" else if(file!=null)"هذه الفئة فارغة" else "اختر ما يستحق المشاركة",if(query.isNotBlank())"جرّب كلمة أخرى أو امسح البحث." else "اختر ملفًا من جهازك باستخدام منتقي Android.",action=if(query.isNotBlank())"مسح البحث" else "اختيار ملف",onAction={if(query.isNotBlank())query="" else onPick()})
-                            EzButton(if(file==null)"اختيار ملف حقيقي" else "تغيير الملف",onPick,Modifier.fillMaxWidth().padding(top=16.dp),enabled=!state.busy,outline=true,icon=R.drawable.ic_folder_open)
-                            Spacer(Modifier.height(16.dp));EzNotice("تدعم Alpha ملفًا واحدًا في كل عملية. التحديد المتعدد لاحقًا؛ لا تُعرض ملفات وهمية أو تُطلب صلاحية وصول شاملة.")
-                            if(category=="التطبيقات"){Spacer(Modifier.height(12.dp));EzNotice("يمكن اختيار APK قابل للتوزيع من الملفات. استخراج التطبيقات المثبتة والحزم المجزأة غير منفّذ.")}
+                            NativeFiles(catalog,chosen,category,onToggle,onMany,onPick,onBrowseFolder,onMediaPermission,onCatalogRefresh,onOpenDirectory,onCatalogUp,onDeviceFiles,onPreview,permissionNote)
                         }
                         "discover"->{
                             EzBadge("اقتران محلي · شبكة Wi-Fi نفسها")
                             Text("مين نشارك معه؟",style=MaterialTheme.typography.headlineLarge)
-                            Text("ملف واحد · ${humanSize(state.picked?.metadata?.size?:0)}",fontSize=12.sp,color=p.muted)
+                            Text("${chosen.size} ملفات · ${humanSize(if(chosen.any{it.metadata.size<0})-1 else chosen.sumOf{it.metadata.size})}",fontSize=12.sp,color=p.muted)
                             Box(Modifier.padding(top=24.dp,bottom=12.dp).clip(RoundedCornerShape(25.dp)).background(EzTokens.CategoryPurple).ezPress({route("scanner")})){
-                                Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){EzIcon(R.drawable.ic_scan,size=30.dp,tint=EzTokens.Ink);Column(Modifier.weight(1f)){Text("مسح رمز QR",fontWeight=FontWeight.SemiBold,color=EzTokens.Ink);Text("قريبًا · الاتصال اليدوي متاح الآن",fontSize=10.sp,color=EzTokens.Ink)};EzIcon(R.drawable.ic_arrow_up_left,size=20.dp,tint=EzTokens.Ink)}
+                                Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){EzIcon(R.drawable.ic_scan,size=30.dp,tint=EzTokens.Ink);Column(Modifier.weight(1f)){Text("مسح رمز QR",fontWeight=FontWeight.SemiBold,color=EzTokens.Ink);Text("امسح رمز جهاز الاستقبال",fontSize=10.sp,color=EzTokens.Ink)};EzIcon(R.drawable.ic_arrow_up_left,size=20.dp,tint=EzTokens.Ink)}
                             }
                             EzSection("أجهزة قريبة","إعادة البحث",onDiscover)
                             Text(state.discoveryMessage.ifBlank{"فعّل الاستقبال على الهاتف الآخر."},fontSize=11.sp,color=p.muted)
                             if(state.busy){EzEmpty("جارٍ الاتصال…","قارن الرمز على الهاتفين عند ظهوره.",R.drawable.ic_broadcast);LinearProgressIndicator(Modifier.fillMaxWidth(),color=EzTokens.Accent)}
                             else if(state.peers.isEmpty())EzEmpty("لا توجد أجهزة قريبة","قرّب الجهاز الآخر وفعّل الاستقبال، أو استخدم العنوان اليدوي.",R.drawable.ic_devices, "إعادة المحاولة",onDiscover)
-                            else state.peers.forEach{peer->Row(Modifier.fillMaxWidth().padding(vertical=5.dp).clip(RoundedCornerShape(23.dp)).background(p.soft).ezPress({onSend(peer.address)},state.picked!=null&&!state.busy).padding(15.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(13.dp)){EzAvatar(1);Column(Modifier.weight(1f)){Text(peer.name,fontSize=14.sp,fontWeight=FontWeight.SemiBold);Text(peer.address,fontSize=10.sp,color=p.muted)};EzIcon(R.drawable.ic_arrow_up_left,size=20.dp)}}
+                            else state.peers.forEach{peer->Row(Modifier.fillMaxWidth().padding(vertical=5.dp).clip(RoundedCornerShape(23.dp)).background(p.soft).ezPress({onSend(peer.address)},chosen.isNotEmpty()&&!state.busy).padding(15.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(13.dp)){EzAvatar(1);Column(Modifier.weight(1f)){Text(peer.name,fontSize=14.sp,fontWeight=FontWeight.SemiBold);Text(peer.address,fontSize=10.sp,color=p.muted)};EzIcon(R.drawable.ic_arrow_up_left,size=20.dp)}}
                             Spacer(Modifier.height(16.dp));EzField(address,{address=it},"العنوان اليدوي IP:PORT","192.168.1.8:34567",enabled=!state.busy)
-                            EzButton("اتصال وطلب مشاركة الملف",{onSend(address)},Modifier.fillMaxWidth().padding(vertical=16.dp),enabled=state.picked!=null&&address.isNotBlank()&&!state.busy)
+                            EzButton("اتصال وطلب مشاركة الملف",{onSend(address)},Modifier.fillMaxWidth().padding(vertical=16.dp),enabled=chosen.isNotEmpty()&&address.isNotBlank()&&!state.busy)
                             if(state.busy)EzButton("إلغاء الاتصال",onCancel,Modifier.fillMaxWidth(),outline=true)
                             EzNotice("الاسم والعنوان لا يثبتان هوية الجهاز. يجب مقارنة رمز التحقق قبل قبول النقل.")
                         }
@@ -111,7 +100,11 @@ import java.util.Locale
                             Column(Modifier.fillMaxWidth().padding(top=24.dp,bottom=12.dp).clip(RoundedCornerShape(28.dp)).background(p.surface).border(1.dp,p.line,RoundedCornerShape(28.dp)).padding(20.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)){
                                 Box(Modifier.size(132.dp).clip(RoundedCornerShape(38.dp)).background(EzTokens.CategoryBlue),contentAlignment=Alignment.Center){EzIcon(if(state.listening)R.drawable.ic_broadcast else R.drawable.ic_devices,size=68.dp,tint=EzTokens.Ink)}
                                 Text(if(state.listening)"بانتظار طلب مشاركة" else "جاهز للاستقبال",fontSize=16.sp,fontWeight=FontWeight.SemiBold)
-                                Text("QR قريبًا · الاتصال اليدوي متاح",fontSize=10.sp,color=p.muted)
+                                if(state.listening&&addresses.isNotEmpty()){
+                                    var qrAddress by rememberSaveable(addresses,state.port){mutableStateOf(addresses.first())}
+                                    val now=System.currentTimeMillis()/1000
+                                    if(now<state.pairingExpiry){if(addresses.size>1)ChoiceMenu(qrAddress,addresses){qrAddress=it};ReceiverQr(com.ezshare.core.PairingQr(qrAddress,state.port,state.pairingNonce,state.pairingExpiry).encode());Text("ينتهي خلال ${state.pairingExpiry-now} ث",fontSize=10.sp,color=p.muted)}else EzNotice("انتهت صلاحية QR. أوقف الاستقبال وأعد تفعيله لتوليد جلسة جديدة.")
+                                }else Text("فعّل الاستقبال لإظهار رمز QR محلي",fontSize=10.sp,color=p.muted)
                             }
                             EzButton(if(state.folder==null)"اختيار مجلد الحفظ" else "تغيير مجلد الحفظ",onFolder,Modifier.fillMaxWidth().padding(top=12.dp),enabled=!state.busy&&!state.listening,outline=true)
                             if(state.folder!=null)Text("مجلد محلي محدد · لا يُحفظ ملف قبل موافقتك",Modifier.padding(top=8.dp),fontSize=10.sp,color=p.muted)
@@ -122,11 +115,11 @@ import java.util.Locale
                             }
                             EzNotice("اختر مجلدًا محليًا فرعيًا مثل Documents/EZ. النقل يحتاج هاتفين على الشبكة نفسها؛ لا يحتاج إنترنت.")
                         }
-                        "scanner"->{EzBadge("QR · قريبًا");Text("قرّب الرمز.",style=MaterialTheme.typography.headlineLarge);Text("المسح غير مفعّل في هذه النسخة. لا نطلب إذن الكاميرا.",fontSize=12.sp,color=p.muted);Column(Modifier.fillMaxWidth().padding(top=24.dp).clip(RoundedCornerShape(30.dp)).background(Color(0xff161b25)).height(270.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){EzIcon(R.drawable.ic_scan,size=100.dp,tint=Color(0xffeae5ff));Text("ماسح QR — قريبًا",Modifier.padding(top=22.dp),color=Color.White,fontSize=12.sp)};EzButton("اختيار جهاز قريب",{route("discover")},Modifier.fillMaxWidth().padding(top=24.dp));Spacer(Modifier.height(16.dp));EzNotice("عرض رمز لا ينشئ اتصالًا لاسلكيًا بمفرده. استخدم اكتشاف الأجهزة أو عنوان IP والمنفذ الآن.")}
+                        "scanner"->{EzBadge("QR · اقتران محلي");Text("قرّب الرمز.",style=MaterialTheme.typography.headlineLarge);PairingScanner{qr->route("transfer");onScan(qr)};EzButton("اختيار جهاز قريب",{route("discover")},Modifier.fillMaxWidth().padding(top=24.dp),outline=true);Spacer(Modifier.height(16.dp));EzNotice("الرمز يحدد جلسة محلية فقط. قارن رمز التحقق ووافق على الهاتفين.")}
                         "confirm"->{
                             val r=state.request
                             EzBadge("تأكيد الاتصال · مقارنة على الهاتفين")
-                            if(r!=null){Column(Modifier.fillMaxWidth().padding(vertical=20.dp).clip(RoundedCornerShape(28.dp)).background(p.soft).padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(16.dp)){EzAvatar(1);Text(if(r.incoming)"تقبل المشاركة؟" else "هذا هو الجهاز؟",fontSize=28.sp,fontWeight=FontWeight.Bold);Text(r.peer,fontSize=19.sp,fontWeight=FontWeight.SemiBold);Text("رمز التحقق على الجهازين",fontSize=12.sp,color=p.muted);SelectionContainer{Text(r.sas,fontSize=38.sp,fontWeight=FontWeight.Bold,letterSpacing=4.sp)};r.metadata?.let{Text(it.name,fontSize=12.sp);Text(humanSize(it.size),fontSize=11.sp,color=p.muted)};Text("قارن الرمز نفسه على الهاتفين. وافق فقط إذا تطابق وكان الجهاز معروفًا لك.",fontSize=12.sp,textAlign=TextAlign.Center,color=p.muted)}
+                            if(r!=null){Column(Modifier.fillMaxWidth().padding(vertical=20.dp).clip(RoundedCornerShape(28.dp)).background(p.soft).padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(16.dp)){EzAvatar(1);Text(if(r.incoming)"تقبل المشاركة؟" else "هذا هو الجهاز؟",fontSize=28.sp,fontWeight=FontWeight.Bold);Text(r.peer,fontSize=19.sp,fontWeight=FontWeight.SemiBold);Text("رمز التحقق على الجهازين",fontSize=12.sp,color=p.muted);SelectionContainer{Text(r.sas,fontSize=38.sp,fontWeight=FontWeight.Bold,letterSpacing=4.sp)};r.metadata?.let{Text(it.name,fontSize=12.sp);Text(humanSize(it.size),fontSize=11.sp,color=p.muted)};if(r.files.isNotEmpty())Text("${r.files.size} ملفات · ${humanSize(if(r.files.any{it.size<0})-1 else r.files.sumOf{it.size})}",fontSize=12.sp);Text("قارن الرمز نفسه على الهاتفين. وافق فقط إذا تطابق وكان الجهاز معروفًا لك.",fontSize=12.sp,textAlign=TextAlign.Center,color=p.muted)}
                                 EzButton(if(r.incoming)"قبول الاتصال والاستقبال" else "تأكيد وإرسال الملف",{onDecide(true);route("transfer")},Modifier.fillMaxWidth().padding(top=12.dp));EzButton("إلغاء الاتصال",{onDecide(false);back()},Modifier.fillMaxWidth().padding(top=12.dp),outline=true)
                             }else EzEmpty("انتهى طلب الاتصال","ارجع إلى الأجهزة القريبة وأعد المحاولة.",action="رجوع",onAction={back()})
                         }
@@ -148,7 +141,7 @@ import java.util.Locale
                                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(25.dp)).background(p.soft).padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(statusLabel(r.status),fontSize=17.sp,fontWeight=FontWeight.SemiBold);Text(dateLabel(r.date),fontSize=12.sp,color=p.muted);Text("ملف واحد · ${humanSize(r.total)}",fontSize=12.sp);Text("المدة النشطة: ${"%.2f".format(Locale.US,r.duration)} ث",fontSize=12.sp);Text("متوسط السرعة: ${if(r.duration>0)"%.2f MB/s".format(Locale.US,r.bytes/r.duration/1e6) else "غير متاح"}",fontSize=12.sp);if(r.sha.isNotBlank())SelectionContainer{Text("SHA-256\n${r.sha}",fontSize=10.sp,lineHeight=18.sp)}}
                                 FileRow(r.name,"${humanSize(r.bytes)} · ${statusLabel(r.status)}",R.drawable.ic_file_text,r.status=="completed",null)
                                 EzButton("مشاركة الملف مرة أخرى",{openFiles();onPick()},Modifier.fillMaxWidth().padding(top=24.dp),outline=true)
-                                if(r.status!="completed"){Spacer(Modifier.height(16.dp));EzNotice("إعادة المحاولة تبدأ نقلًا جديدًا. الاستئناف من إزاحة سابقة غير متاح في Alpha.")}
+                                if(r.status!="completed"){Spacer(Modifier.height(16.dp));EzNotice("إعادة المحاولة تبدأ نقلًا جديدًا. الاستئناف من إزاحة سابقة غير متاح في هذه النسخة.")}
                             }
                         }
                         "settings"->{
@@ -174,8 +167,8 @@ import java.util.Locale
             }
         }
         if(screen=="files")Row(Modifier.align(Alignment.BottomCenter).padding(start=24.dp,end=24.dp,bottom=bottom+107.dp).fillMaxWidth().clip(RoundedCornerShape(25.dp)).background(p.surface).border(1.dp,p.line,RoundedCornerShape(25.dp)).padding(10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
-            Column(Modifier.weight(1f)){Text("${if(selected&&state.picked!=null)1 else 0} ملفات محددة",fontSize=11.sp);Text(humanSize(if(selected)state.picked?.metadata?.size?:0 else 0),fontSize=10.sp,color=p.muted)}
-            EzButton("إرسال الملفات",{route("discover");onDiscover()},enabled=selected&&state.picked!=null&&!state.busy,icon=R.drawable.ic_arrow_up_left)
+            Column(Modifier.weight(1f)){Text("${chosen.size} ملفات محددة",fontSize=11.sp);Text(humanSize(if(chosen.any{it.metadata.size<0})-1 else chosen.sumOf{it.metadata.size}),fontSize=10.sp,color=p.muted)}
+            EzButton("إرسال الملفات",{route("discover");onDiscover()},enabled=chosen.isNotEmpty()&&!state.busy,icon=R.drawable.ic_arrow_up_left)
         }
         if((state.busy||state.listening)&&screen !in listOf("transfer","confirm","receive","discover")){
             Box(Modifier.align(Alignment.BottomCenter).padding(horizontal=24.dp).padding(bottom=bottom+if(screen=="files")195.dp else 100.dp).clip(RoundedCornerShape(18.dp)).background(EzTokens.CategoryPurple).ezPress({route(if(state.listening&&!state.busy)"receive" else "transfer")}).padding(horizontal=12.dp,vertical=8.dp)){Text(if(state.listening&&!state.busy)"العودة للاستقبال · بانتظار طلب" else "العودة للنقل · ${state.status}",fontSize=10.sp,color=EzTokens.Ink)}
@@ -186,10 +179,10 @@ import java.util.Locale
         Column(Modifier.fillMaxWidth().padding(horizontal=24.dp).padding(bottom=32.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
             Text(when(sheet){"share"->"مشاركة تطبيق EZ";"clear-history"->"مسح السجل؟";"cancel-transfer"->"إلغاء النقل؟";else->"بسيطة. وقريبة. وخاصة."},fontSize=23.sp,fontWeight=FontWeight.Bold)
             when(sheet){
-                "share"->{Text("شارك التطبيق مع أصدقائك",fontSize=13.sp,color=p.muted);SheetOption(R.drawable.ic_link,"مشاركة رابط التطبيق","قريبًا · لم يُنشر رابط توزيع بعد"){feedback="لا يوجد رابط منشور موثوق للتطبيق حتى الآن."};SheetOption(R.drawable.ic_android_logo,"مشاركة التطبيق بدون إنترنت","قريبًا · مشاركة APK موثوق قابل للتوزيع"){feedback="مشاركة APK غير منفّذة في هذه النسخة. إرسال ملفاتك مستقل عن مشاركة EZ."};EzNotice("لا يوجد رابط Play Store مفترض، ولا مشاركة APK فعلية من هذا الزر.");if(feedback.isNotBlank())EzNotice(feedback)}
+                "share"->{Text("شارك التطبيق مع أصدقائك",fontSize=13.sp,color=p.muted);SheetOption(R.drawable.ic_link,"مشاركة رابط التطبيق","يتحقق من وجود إصدار رسمي منشور؛ يتطلب اتصالًا للتحقق",onShareLink);SheetOption(R.drawable.ic_android_logo,"مشاركة التطبيق بدون إنترنت","APK كامل ومطابق للتوقيع · عبر قائمة مشاركة Android",onShareApk);EzNotice("تختار Bluetooth أو Quick Share من تطبيقات المشاركة المتاحة. الحزم المجزأة تحتاج APK كاملًا؛ لا يُشارك base.apk وحده.")}
                 "clear-history"->{Text("سيُحذف سجل العمليات فقط. لن تُحذف أي ملفات من الجهاز.",fontSize=13.sp);EzButton("مسح السجل فقط",{onClearHistory();sheet=""},Modifier.fillMaxWidth());EzButton("الاحتفاظ بالسجل",{sheet=""},Modifier.fillMaxWidth(),outline=true)}
-                "cancel-transfer"->{Text("سيتوقف النقل وتبقى الملفات غير المكتملة غير ناجحة. الاستئناف غير متاح في Alpha.",fontSize=13.sp);EzButton("تأكيد إلغاء النقل",{onCancel();sheet=""},Modifier.fillMaxWidth());EzButton("متابعة النقل",{sheet=""},Modifier.fillMaxWidth(),outline=true)}
-                else->{EzIcon(R.drawable.ic_shield_check,size=40.dp);Text("يُنقل ملفك محليًا بين الهاتفين، دون حساب أو خادم سحابي. قارن رمز التحقق يدويًا قبل الموافقة على الطرفين.",fontSize=13.sp);EzNotice("Alpha تجريبية. بروتوكول الاقتران جديد ويحتاج مراجعة أمنية مستقلة واختبارًا على هاتفين.");Text("Wi-Fi Direct وQR والنقل المتعدد والإيقاف المؤقت والاستئناف ومشاركة التطبيق لاحقًا.",fontSize=12.sp,color=p.muted);EzButton("فهمت",{sheet=""},Modifier.fillMaxWidth())}
+                "cancel-transfer"->{Text("سيتوقف النقل وتبقى الملفات غير المكتملة غير ناجحة. الاستئناف غير متاح في هذه النسخة.",fontSize=13.sp);EzButton("تأكيد إلغاء النقل",{onCancel();sheet=""},Modifier.fillMaxWidth());EzButton("متابعة النقل",{sheet=""},Modifier.fillMaxWidth(),outline=true)}
+                else->{EzIcon(R.drawable.ic_shield_check,size=40.dp);Text("يُنقل ملفك محليًا بين الهاتفين، دون حساب أو خادم سحابي. قارن رمز التحقق يدويًا قبل الموافقة على الطرفين.",fontSize=13.sp);EzNotice("قارن رمز التحقق على الهاتفين قبل الموافقة. QR لا يحل محل التحقق اليدوي.");Text("النقل على الشبكة المحلية نفسها. Wi-Fi Direct والإيقاف المؤقت والاستئناف غير متاحة حاليًا.",fontSize=12.sp,color=p.muted);EzButton("فهمت",{sheet=""},Modifier.fillMaxWidth())}
             }
             TextButton(onClick={sheet=""},modifier=Modifier.fillMaxWidth()){Text("إغلاق",color=EzTokens.Accent)}
         }
