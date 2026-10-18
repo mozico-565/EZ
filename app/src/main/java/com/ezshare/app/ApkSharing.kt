@@ -32,7 +32,7 @@ object ApkSharing {
     }
     fun shareIntent(context:Context,file:File):Intent {
         val uri=FileProvider.getUriForFile(context,context.packageName+".files",file)
-        return Intent(Intent.ACTION_SEND).setType(APK_MIME).putExtra(Intent.EXTRA_STREAM,uri).setClipData(ClipData.newRawUri("APK",uri)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        return Intent(Intent.ACTION_SEND).setType(APK_MIME).putExtra(Intent.EXTRA_STREAM,uri).apply{clipData=ClipData.newRawUri("APK",uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)}
     }
     fun share(context:Context,file:File){context.startActivity(Intent.createChooser(shareIntent(context,file),"مشاركة تطبيق EZ").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))}
     /** Do not claim a release URL exists. Obtain and verify it only on explicit user request. */

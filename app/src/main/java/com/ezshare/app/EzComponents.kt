@@ -117,7 +117,7 @@ val categories=listOf(Category("الصور",R.drawable.ic_images,EzTokens.Catego
     if(state.filename.isNotBlank()){Text("الملف الحالي: ${state.filename}",Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).border(1.dp,p.line,RoundedCornerShape(17.dp)).padding(10.dp),fontSize=11.sp)}
     pr?.let{Text("المتوسط الفعلي: %.2f MB/s".format(Locale.US,it.averageMBps),Modifier.padding(top=12.dp),fontSize=12.sp,color=p.muted)}
     state.files.forEachIndexed{i,m->val verified=i<state.completedResults.size;Text("${if(verified)"✓" else if(i==state.fileIndex)"•" else "○"} ${m.name} · ${if(verified)"مكتمل ومتحقق" else if(failed||cancelled)"لم يكتمل" else "بانتظار الإكمال"}",Modifier.padding(top=8.dp),fontSize=10.sp,color=p.muted)}
-    if(state.timings.isNotEmpty()){EzSection("تفاصيل الزمن الفعلي");state.timings.forEach{t->Text("${t.phase}: ${"%.3f".format(Locale.US,t.nanos/1e9)} ث",fontSize=10.sp,color=p.muted)}}
+    if(state.timings.isNotEmpty()){EzSection("تفاصيل الزمن الفعلي");state.timings.forEach{t->Text("${phaseLabel(t.phase)}${if(t.fileIndex>=0)" · ملف ${t.fileIndex+1}" else ""}: ${"%.3f".format(Locale.US,t.nanos/1e9)} ث",fontSize=10.sp,color=p.muted)}}
     if(state.busy)EzButton("إلغاء النقل",onCancel,Modifier.fillMaxWidth().padding(vertical=20.dp),outline=true)
     state.error?.let{Spacer(Modifier.height(16.dp));EzNotice(it,true);Spacer(Modifier.height(12.dp));EzButton("إعادة المحاولة",onRetry,Modifier.fillMaxWidth());Spacer(Modifier.height(12.dp));EzNotice("ستبدأ عملية جديدة. استكمال نقل منقطع غير متاح؛ لا تُعد الملفات الجزئية مكتملة.")}
     state.result?.let{r->Spacer(Modifier.height(16.dp));EzNotice("تمت كتابة الملف والتحقق من الحجم وبصمة SHA-256. ${if(state.incoming)"حُفظ في المجلد المحدد." else "وصل إيصال التحقق من المستقبل."}");EzButton("تفاصيل العملية",onDetails,Modifier.fillMaxWidth().padding(top=20.dp),outline=true)}
@@ -129,3 +129,5 @@ fun fileCategory(mime:String,name:String)=when{mime.startsWith("image/")->"ال�
 fun fileIcon(category:String)=categories.find{it.label==category}?.icon?:R.drawable.ic_file_text
 fun statusLabel(status:String)=when(status){"completed"->"مكتمل";"cancelled"->"تم الإلغاء";else->"تعذّر إكمال النقل"}
 fun dateLabel(millis:Long)=DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT,Locale("ar","SA")).format(Date(millis))
+
+fun phaseLabel(phase:String)=when(phase){"discovery_first_peer"->"ظهور أول جهاز";"connection"->"الاتصال";"handshake"->"تهيئة التشفير";"approval"->"انتظار الموافقة";"first_wire_chunk"->"أول جزء من الملف";"streaming"->"نقل البيانات";"storage_write_within_streaming"->"الكتابة أثناء النقل";"storage_readback_and_publish"->"التحقق من الملف المحفوظ";"receipt_and_remote_verification"->"انتظار التحقق والإيصال";"total_session"->"الجلسة كاملة دون الاكتشاف";else->phase}

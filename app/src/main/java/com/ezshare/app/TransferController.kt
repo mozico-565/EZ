@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import com.ezshare.core.*
+import com.ezshare.core.ProtocolException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*
@@ -38,7 +39,9 @@ class TransferController(private val app:Application) {
     @Volatile private var server:ServerSocket?=null
     @Volatile private var approval:CompletableDeferred<Boolean>?=null
     @Volatile private var activeStream:Closeable?=null
-    private val discovery=Discovery(app,{ peers->_ui.update { it.copy(peers=peers) } },{ message->_ui.update { it.copy(discoveryMessage=message) } })
+    @Volatile private var discoveryStart=0L
+    @Volatile private var discoveryLatency=0L
+    private val discovery=Discovery(app,{ peers->if(peers.isNotEmpty()&&discoveryStart>0&&discoveryLatency==0L)discoveryLatency=System.nanoTime()-discoveryStart;_ui.update { it.copy(peers=peers) } },{ message->_ui.update { it.copy(discoveryMessage=message) } })
     val identity:String get()=EzLocalStore(app).read().name.ifBlank{Build.MODEL}.take(48)
     fun status(s:String){_ui.update{it.copy(status=s)}}
     fun page(s:String){_ui.update{it.copy(stage=s)}}
@@ -60,7 +63,7 @@ class TransferController(private val app:Application) {
         app.contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         _ui.update{it.copy(folder=uri,error=null)}
     }catch(e:Exception){fail(e)}}
-    fun startDiscovery(){discovery.discover()}
+    fun startDiscovery(){discoveryStart=System.nanoTime();discoveryLatency=0;discovery.discover()}
     fun stopDiscovery(){discovery.stopDiscovery()}
     fun decide(accepted:Boolean){approval?.complete(accepted)}
     private fun ask(peer:String,sas:String,m:Metadata?,incoming:Boolean,files:List<Metadata> = emptyList()):Boolean=runBlocking {
@@ -98,7 +101,7 @@ class TransferController(private val app:Application) {
             if(cancellationRequested)throw IOException("Cancelled");socket.connect(InetSocketAddress(host,port),10_000);c.touch();val connectNanos=System.nanoTime()-started
             val result=BatchEngine.send(c,identity,Manifest(files.map{it.metadata},pairingNonce=nonce),files.map{file->{(app.contentResolver.openInputStream(file.uri)?:throw IOException("لا يمكن فتح الملف")).also{activeStream=it}}},
                 {m,peer,sas->ask(peer,sas,m.files.firstOrNull(),false,m.files)},::batchProgress,::completed)
-            finishBatch(result.copy(timings=listOf(PhaseTiming("connection",-1,connectNanos))+result.timings))
+            finishBatch(result.copy(timings=(if(discoveryLatency>0)listOf(PhaseTiming("discovery_first_peer",-1,discoveryLatency)) else emptyList())+PhaseTiming("connection",-1,connectNanos)+result.timings))
         }catch(e:Exception){fail(e)}finally{runCatching{activeStream?.close()};activeStream=null;connection?.close();connection=null;inUse.set(false);_ui.update{it.copy(busy=false)};stopForeground()}}
     }
     private fun batchProgress(p:BatchProgress){_ui.update{it.copy(progress=p.overall,fileIndex=p.index,phase=p.stage,filename=p.name,status=if(p.stage=="verifying")"جارٍ التحقق من الملف المحفوظ…" else "جارٍ النقل الفعلي…",stage="transfer")}}
