@@ -98,8 +98,8 @@ jobs:
         env:
           STORE_B64: ${{ secrets.EZ_RELEASE_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.EZ_RELEASE_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.EZ_RELEASE_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.EZ_RELEASE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.EZ_RELEASE_KEY_ALIAS || 'ez-release' }}
+          KEY_PASSWORD: ${{ secrets.EZ_RELEASE_KEY_PASSWORD || secrets.EZ_RELEASE_STORE_PASSWORD }}
         run: |
           test -n "$STORE_B64" && test -n "$STORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" || { echo 'Production signing credentials are missing; refusing debug or ephemeral fallback.'; exit 1; }
           python3 - <<'PY'
@@ -112,8 +112,8 @@ jobs:
       - name: Test, capture, lint, and assemble signed non-debug candidate
         env:
           EZ_RELEASE_STORE_PASSWORD: ${{ secrets.EZ_RELEASE_STORE_PASSWORD }}
-          EZ_RELEASE_KEY_ALIAS: ${{ secrets.EZ_RELEASE_KEY_ALIAS }}
-          EZ_RELEASE_KEY_PASSWORD: ${{ secrets.EZ_RELEASE_KEY_PASSWORD }}
+          EZ_RELEASE_KEY_ALIAS: ${{ secrets.EZ_RELEASE_KEY_ALIAS || 'ez-release' }}
+          EZ_RELEASE_KEY_PASSWORD: ${{ secrets.EZ_RELEASE_KEY_PASSWORD || secrets.EZ_RELEASE_STORE_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleRelease
