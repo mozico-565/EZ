@@ -5,7 +5,6 @@ import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.os.Build
-import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import com.ezshare.core.*
 import com.ezshare.core.ProtocolException
@@ -13,8 +12,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*
 import java.net.*
-import java.security.MessageDigest
-import java.security.DigestOutputStream
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -24,7 +21,7 @@ data class PickedFile(val uri:Uri,val metadata:Metadata)
 data class PairRequest(val peer:String,val sas:String,val metadata:Metadata?,val incoming:Boolean,val files:List<Metadata> = emptyList())
 data class TransferUi(
     val stage:String="home", val status:String="جاهز", val picked:PickedFile?=null,val selected:List<PickedFile> = emptyList(),
-    val filename:String="", val folder:Uri?=null,val request:PairRequest?=null,val progress:Progress?=null,
+    val filename:String="", val request:PairRequest?=null,val progress:Progress?=null,
     val result:Result?=null,val error:String?=null,val listening:Boolean=false,val port:Int=0,
     val incoming:Boolean=false,val peer:String="",val operation:String="",val files:List<Metadata> = emptyList(),val completedResults:List<Result> = emptyList(),val fileIndex:Int=0,val phase:String="",val timings:List<PhaseTiming> = emptyList(),val pairingNonce:String="",val pairingExpiry:Long=0,val peers:List<Peer> = emptyList(),val discoveryMessage:String="", val busy:Boolean=false
 )
@@ -60,10 +57,6 @@ class TransferController(private val app:Application) {
         try{require(files.size<=256){"يمكن تحديد 256 ملفًا كحد أقصى"};files.forEach{it.metadata.validate()};_ui.update{it.copy(selected=files.distinctBy{f->f.uri},picked=files.firstOrNull(),error=null)}}catch(e:Exception){_ui.update{it.copy(error="تعذّر الاختيار: الحد 256 ملفًا و16GiB للملف الواحد. ${e.message.orEmpty()}",status="تعذّر اختيار الملفات")}}
     }
     fun scan(qr:PairingQr){if(System.currentTimeMillis()/1000>=qr.expires){status("رمز QR منتهي؛ أعد تفعيل الاستقبال");return};send(qr.address,qr.nonce)}
-    fun folder(uri:Uri){try{
-        app.contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        _ui.update{it.copy(folder=uri,error=null)}
-    }catch(e:Exception){fail(e)}}
     fun startDiscovery(){discoveryStart=System.nanoTime();discoveryLatency=0;discovery.discover()}
     fun stopDiscovery(){discovery.stopDiscovery()}
     fun decide(accepted:Boolean){approval?.complete(accepted)}
@@ -72,7 +65,7 @@ class TransferController(private val app:Application) {
         _ui.update{it.copy(filename=m?.name?:it.picked?.metadata?.name.orEmpty(),request=PairRequest(peer,sas,m,incoming,files),files=files,peer=peer,incoming=incoming,status="قارن الرمز على الهاتفين ثم وافق",stage=if(incoming)"receive" else "send")}
         try {withTimeout(115_000){decision.await()}}finally{approval=null;_ui.update{it.copy(request=null)}}
     }
-    fun receive(){if(_ui.value.folder==null){status("اختر مجلد الحفظ أولًا داخل المستندات");return}
+    fun receive(){
         if(inUse.get()||!receiving.compareAndSet(false,true))return
         cancellationRequested=false;wantsReceive=true
         runForeground()
@@ -86,7 +79,7 @@ class TransferController(private val app:Application) {
                         val result=BatchEngine.receive(c,identity,if(System.currentTimeMillis()/1000<expiry)nonce else "",{m,peer,sas->
                             if(m.pairingNonce.isNotBlank()&&System.currentTimeMillis()/1000>=expiry)throw ProtocolException("QR session expired")
                             ask(peer,sas,m.files.firstOrNull(),true,m.files)
-                        },{m->SafPending(app,_ui.value.folder?:throw IOException("اختر مجلدًا"),m){activeStream=it}},::batchProgress,::completed)
+                        },{m->MediaStorePending(app,m){activeStream=it}},::batchProgress,::completed)
                         finishBatch(result)
                     }catch(e:Exception){fail(e)}finally{activeStream=null;c.close();connection=null;inUse.set(false);_ui.update{it.copy(busy=false)}}
                 }
@@ -106,7 +99,7 @@ class TransferController(private val app:Application) {
         }catch(e:Exception){fail(e)}finally{runCatching{activeStream?.close()};activeStream=null;connection?.close();connection=null;inUse.set(false);_ui.update{it.copy(busy=false)};stopForeground()}}
     }
     private fun batchProgress(p:BatchProgress){_ui.update{it.copy(progress=p.overall,fileIndex=p.index,phase=p.stage,filename=p.name,status=when(p.stage){"verifying"->"جارٍ التحقق من الملف المحفوظ…";"preparing"->"جارٍ تجهيز الملف…";else->"جارٍ النقل الفعلي…"},stage="transfer")}}
-    private fun completed(r:Result){val s=_ui.value;store.addHistory(HistoryEntry(id=s.operation+":"+s.completedResults.size+":completed",name=r.metadata.name,bytes=r.bytes,total=r.metadata.size,duration=r.elapsedNanos/1e9,sha=r.sha256,peer=s.peer,incoming=s.incoming,status="completed",savedAt=r.savedAt));_ui.update{it.copy(completedResults=it.completedResults+r)}}
+    private fun completed(r:Result){val s=_ui.value;store.addHistory(HistoryEntry(id=s.operation+":"+s.completedResults.size+":completed",name=if(s.incoming)receivedName(app,r.savedAt,r.metadata.name) else r.metadata.name,bytes=r.bytes,total=r.metadata.size,duration=r.elapsedNanos/1e9,sha=r.sha256,peer=s.peer,incoming=s.incoming,status="completed",savedAt=r.savedAt));_ui.update{it.copy(completedResults=it.completedResults+r)}}
     private fun recordFailure(){val s=_ui.value;if(!s.busy||s.filename.isBlank())return;val completedBytes=s.completedResults.sumOf{it.bytes};val completedTime=s.completedResults.sumOf{it.elapsedNanos};store.addHistory(HistoryEntry(id=s.operation+":"+s.fileIndex+":failed",name=s.filename,bytes=((s.progress?.bytes?:0)-completedBytes).coerceAtLeast(0),total=s.files.getOrNull(s.fileIndex)?.size?:-1,duration=((s.progress?.elapsedNanos?:0)-completedTime).coerceAtLeast(0)/1e9,peer=s.peer,incoming=s.incoming,status=if(cancellationRequested)"cancelled" else "failed"))}
 
     private fun finishBatch(r:BatchResult){_ui.update{it.copy(result=r.files.lastOrNull(),timings=r.timings,progress=it.progress?.copy(currentMBps=0.0),status="اكتمل النقل والتحقق من جميع الملفات",request=null,error=null,stage="result")}}
@@ -114,7 +107,7 @@ class TransferController(private val app:Application) {
     fun stopReceive(){val old=synchronized(this){wantsReceive=false;server.also{server=null}};runCatching{old?.close()};discovery.stopAdvertising();_ui.update{it.copy(listening=false,port=0)};if(!inUse.get())stopForeground()}
     private fun progress(p:Progress){_ui.update{it.copy(progress=p,status="جارٍ نقل الملف الفعلي…",stage="transfer")}}
     private fun finish(result:Result){_ui.update{it.copy(progress=it.progress?.copy(total=result.bytes,currentMBps=0.0),result=result,status="اكتمل النقل والتحقق من SHA-256",request=null,error=null,stage="result")}}
-    private fun fail(e:Exception){recordFailure();if(cancellationRequested){_ui.update{it.copy(error="أُلغي النقل؛ لا يُعد الملف الجزئي ناجحًا.",status="تم الإلغاء",request=null)};return};_ui.update{it.copy(error=when(e){is SocketTimeoutException->"انتهت مهلة الاتصال. قرّب الهاتفين وافحص الشبكة ثم أعد المحاولة.";is ProtocolException->if(e.message?.contains("Unsupported protocol")==true)"إصدار غير متوافق. حدّث EZ على الهاتفين إلى الإصدار نفسه." else "تعذّر اعتماد النقل: ${e.message}";is TimeoutCancellationException->"انتهت مهلة موافقة المستخدم.";else->if(e.message?.contains("Incomplete file cleanup failed")==true)"تعذّر حذف الملف الجزئي. قد يبقى ملف .ezpart في مجلد الحفظ؛ احذفه يدويًا. لم يُعلن نجاحه." else "تعذّرت العملية: ${e.message?:e.javaClass.simpleName}. لم يُعلن نجاح أي ملف جزئي."},status="توقفت العملية",request=null)}}
+    private fun fail(e:Exception){recordFailure();if(cancellationRequested){_ui.update{it.copy(error="أُلغي النقل؛ لا يُعد الملف الجزئي ناجحًا.",status="تم الإلغاء",request=null)};return};_ui.update{it.copy(error=when(e){is SocketTimeoutException->"انتهت مهلة الاتصال. قرّب الهاتفين وافحص الشبكة ثم أعد المحاولة.";is ProtocolException->if(e.message?.contains("Unsupported protocol")==true)"إصدار غير متوافق. حدّث EZ على الهاتفين إلى الإصدار نفسه." else "تعذّر اعتماد النقل: ${e.message}";is TimeoutCancellationException->"انتهت مهلة موافقة المستخدم.";else->if(e.message?.contains("Incomplete file cleanup failed")==true)"تعذّر تنظيف الإدخال الجزئي؛ يظل قيد الكتابة ولا يُعرض كملف مكتمل. لم يُعلن نجاحه." else "تعذّرت العملية: ${e.message?:e.javaClass.simpleName}. لم يُعلن نجاح أي ملف جزئي."},status="توقفت العملية",request=null)}}
     private fun runForeground(){TransferService.start(app)}
     private fun stopForeground(){app.stopService(Intent(app,TransferService::class.java))}
     fun serviceStopped(){if(inUse.get()||server!=null)cancel()}
@@ -124,28 +117,4 @@ fun parseLocalAddress(value:String):Pair<InetAddress,Int>{val parts=value.trim()
     require(parts[0].matches(Regex("[0-9]{1,3}(\\.[0-9]{1,3}){3}"))){"عنوان IPv4 محلي مطلوب"}
     require(parts[0].split('.').all{it.toInt() in 0..255}){"عنوان غير صالح"}
     val host=InetAddress.getByName(parts[0]);require(host.isSiteLocalAddress||host.isLinkLocalAddress){"استخدم عنوان الهاتف على الشبكة المحلية"};val port=parts[1].toIntOrNull()?:0;require(port in 1024..65535){"منفذ غير صالح"};return host to port
-}
-class SafPending(private val app:Application,tree:Uri,m:Metadata,private val onOpen:(Closeable)->Unit):PendingFile {
-    private val resolver=app.contentResolver
-    private val parent=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree))
-    private var uri:Uri
-    private val storageDigest=MessageDigest.getInstance("SHA-256")
-    private val finalName=uniqueFilename(m.name){name->exists(tree,name)}
-    override val output:OutputStream
-    init {
-        uri=DocumentsContract.createDocument(resolver,parent,m.mime,"${finalName}.ezpart-${UUID.randomUUID().toString().take(8)}")?:throw IOException("المجلد لا يدعم إنشاء الملفات")
-        try{output=DigestOutputStream(resolver.openOutputStream(uri,"w")?:throw IOException("تعذّرت الكتابة"),storageDigest);onOpen(output)}catch(e:Exception){runCatching{DocumentsContract.deleteDocument(resolver,uri)};throw e}
-    }
-    private fun exists(tree:Uri,name:String):Boolean {
-        val children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree))
-        return resolver.query(children,arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),null,null,null)?.use { c->var found=false;while(c.moveToNext())if(c.getString(0)==name)found=true;found }?:throw IOException("تعذّر فحص أسماء الملفات")
-    }
-    override fun commit():String {
-        val expected=storageDigest.digest();val actual=MessageDigest.getInstance("SHA-256")
-        (resolver.openInputStream(uri)?:throw IOException("تعذّر إعادة قراءة الملف للتحقق")).use{input->onOpen(input);val buffer=ByteArray(64*1024);while(true){val n=input.read(buffer);if(n<0)break;if(n>0)actual.update(buffer,0,n)}}
-        if(!MessageDigest.isEqual(expected,actual.digest()))throw IOException("فشل التحقق من الملف المحفوظ")
-        val renamed=DocumentsContract.renameDocument(resolver,uri,finalName)?:throw IOException("المجلد لا يدعم نشر الملف بعد التحقق؛ اختر مجلدًا محليًا آخر")
-        uri=renamed;return renamed.toString()
-    }
-    override fun abort(){if(!DocumentsContract.deleteDocument(resolver,uri))throw IOException("تعذّر حذف الملف الجزئي")}
 }

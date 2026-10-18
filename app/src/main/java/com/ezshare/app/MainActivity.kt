@@ -56,7 +56,6 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()){vm.catalog.import(it)}
     val browseFolders=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()){it?.let(vm.catalog::openTree)}
     val mediaPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){vm.catalog.refresh()}
-    val folders=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()){it?.let(controller::folder)}
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){if(!it)Toast.makeText(context,"يمكن متابعة النقل؛ قد يُخفي النظام الإشعار",Toast.LENGTH_LONG).show()}
     fun notifyPermission(){if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)permission.launch(Manifest.permission.POST_NOTIFICATIONS)}
     val dark=prefs.theme=="dark"||prefs.theme=="system"&&isSystemInDarkTheme()
@@ -66,8 +65,8 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
     }
     val systemQuiet=runCatching{Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}.getOrDefault(false)
     EzTheme(dark,prefs.quiet||systemQuiet){EzApp(state,prefs,history,addresses,
-        onPick={picker.launch(arrayOf("*/*"))},onFolder={folders.launch(null)},onDiscover=controller::startDiscovery,
-        onSend={notifyPermission();controller.send(it)},onReceive={notifyPermission();controller.receive()},onCancel=controller::cancel,onDecide=controller::decide,onSave=vm::save,onClearHistory=vm::clearHistory,
+        onPick={picker.launch(arrayOf("*/*"))},onDiscover=controller::startDiscovery,
+        onSend={notifyPermission();controller.send(it)},onReceive={notifyPermission();controller.receive()},onCancel=controller::cancel,onDecide=controller::decide,onSave=vm::save,onClearHistory=vm::clearHistory,onOpenReceived={openReceived(context,it,false)},onShareReceived={openReceived(context,it,true)},
         catalog=catalog,onToggle=::toggle,onMany={files,select->
             if(select){val combined=(state.selected+files.map{PickedFile(it.uri,it.metadata)}).distinctBy{it.uri};if(combined.size>256)message("حد العملية 256 ملفًا؛ قلّل التحديد") else scope.launch{try{val prepared=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){files.map{f->if(f.packageName.isBlank())PickedFile(f.uri,f.metadata) else {val apk=ApkSharing.export(context,f.packageName);PickedFile(android.net.Uri.fromFile(apk),f.metadata.copy(size=apk.length()))}}};controller.select((controller.ui.value.selected+prepared).distinctBy{it.uri})}catch(e:Exception){message(e.message?:"تعذّر تجهيز التطبيقات")}}}else controller.select(state.selected.filter{f->files.none{it.uri==f.uri||it.packageName.isNotBlank()&&f.uri.lastPathSegment?.startsWith(it.packageName+"-")==true}})
         },onBrowseFolder={browseFolders.launch(null)},onMediaPermission={mediaPermission.launch(vm.catalog.permissions())},onCatalogRefresh=vm.catalog::refresh,onOpenDirectory=vm.catalog::open,onCatalogUp=vm.catalog::up,onDeviceFiles=vm.catalog::device,

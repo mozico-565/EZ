@@ -20,15 +20,30 @@ object ApkSharing {
         val original=File(app.sourceDir);require(original.isFile&&original.canRead()){"APK غير متاح للقراءة"}
         val directory=File(context.cacheDir,"exports").apply{mkdirs()};val destination=File(directory,"${packageName}-${installed.longVersionCode}.apk")
         // Atomic copy on IO dispatcher. A bounded buffer handles large distributable packages.
-        val temp=File.createTempFile("export-",".tmp",directory)
-        try{original.inputStream().use{input->temp.outputStream().use{input.copyTo(it,256*1024)}}
+        val temp=File.createTempFile("export-",".apk",directory)
+        fun hash(file:File):ByteArray=file.inputStream().use { input ->
+            val digest=MessageDigest.getInstance("SHA-256");val buffer=ByteArray(256*1024)
+            while(true){val n=input.read(buffer);if(n<0)break;if(n>0)digest.update(buffer,0,n)};digest.digest()
+        }
+        try{val expectedBytes=hash(original)
+            original.inputStream().use{input->temp.outputStream().use{input.copyTo(it,256*1024)}}
+            require(MessageDigest.isEqual(expectedBytes,hash(temp))&&MessageDigest.isEqual(expectedBytes,hash(original))){"تغيّر APK أثناء التجهيز؛ أعد المحاولة"}
             val archive=pm.getPackageArchiveInfo(temp.path,PackageManager.GET_SIGNING_CERTIFICATES)?:error("APK غير صالح")
             require(archive.packageName==packageName&&archive.longVersionCode==installed.longVersionCode){"إصدار أو حزمة APK غير مطابقة"}
             fun signatures(info:android.content.pm.PackageInfo)=info.signingInfo?.apkContentsSigners?.map{MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).toList()}?.toSet().orEmpty()
-            val expected=signatures(installed);require(expected.isNotEmpty()&&expected==signatures(archive)){"توقيع APK غير مطابق"}
+            val expected=signatures(installed);val copied=signatures(archive)
+            // Some OEM archive parsers omit SigningInfo. A byte-identical copy of the
+            // Android-installed APK preserves its signature; absence is not mismatch.
+            verifyExportIdentity(expected,copied)
+            val current=pm.getPackageInfo(packageName,PackageManager.GET_SIGNING_CERTIFICATES)
+            require(current.longVersionCode==installed.longVersionCode&&current.applicationInfo?.sourceDir==app.sourceDir&&signatures(current)==expected){"تغيّر التطبيق أثناء التجهيز؛ أعد المحاولة"}
             require(temp.length()==original.length()){"نسخة APK غير مكتملة"}
             if(destination.exists())require(destination.delete()){"تعذّر تحديث نسخة المشاركة"};require(temp.renameTo(destination)){"تعذّر تجهيز APK"};return destination
         }finally{temp.delete()}
+    }
+    internal fun verifyExportIdentity(installed:Set<List<Byte>>,archive:Set<List<Byte>>){
+        require(installed.isNotEmpty()){ "تعذّر التحقق من توقيع التطبيق المثبّت" }
+        require(archive.isEmpty()||installed==archive){ "توقيع APK غير مطابق" }
     }
     fun shareIntent(context:Context,file:File):Intent {
         val uri=FileProvider.getUriForFile(context,context.packageName+".files",file)

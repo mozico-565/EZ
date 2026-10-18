@@ -33,7 +33,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class,ExperimentalLayoutApi::class)
 @Composable fun EzApp(
     state:TransferUi,prefs:EzPreferences,history:List<HistoryEntry>,addresses:List<String>,
-    onPick:()->Unit={},onFolder:()->Unit={},onDiscover:()->Unit={},onSend:(String)->Unit={},onReceive:()->Unit={},onCancel:()->Unit={},onDecide:(Boolean)->Unit={},onSave:(EzPreferences)->Unit={},onClearHistory:()->Unit={},
+    onPick:()->Unit={},onDiscover:()->Unit={},onSend:(String)->Unit={},onReceive:()->Unit={},onCancel:()->Unit={},onDecide:(Boolean)->Unit={},onSave:(EzPreferences)->Unit={},onClearHistory:()->Unit={},onOpenReceived:(HistoryEntry)->Unit={},onShareReceived:(HistoryEntry)->Unit={},
     initialDestination:String="home",initialSheet:String="",
     catalog:CatalogState=CatalogState(),onToggle:(LocalFile)->Unit={},onMany:(List<LocalFile>,Boolean)->Unit={_,_->},onBrowseFolder:()->Unit={},onMediaPermission:()->Unit={},onCatalogRefresh:()->Unit={},onOpenDirectory:(LocalFile)->Unit={},onCatalogUp:()->Unit={},onDeviceFiles:()->Unit={},onPreview:(LocalFile)->Unit={},permissionNote:String="يعرض الملفات المسموح بها فقط.",onScan:(com.ezshare.core.PairingQr)->Unit={},onShareApk:()->Unit={},onShareLink:()->Unit={}
 ){
@@ -69,7 +69,7 @@ import java.util.Locale
                     if(state.error!=null&&page!="transfer"&&page!="home"){EzNotice(state.error,true);Spacer(Modifier.height(16.dp))}
                     when(page){
                         "home"->{
-                            HomeContent(onFiles={openFiles(it)},onReceive={route("receive")},onPrivacy={sheet="privacy"},latest=history.firstOrNull(),onHistory={route("history")})
+                            HomeContent(onFiles={openFiles(it)},onReceive={route("receive");onReceive()},onPrivacy={sheet="privacy"},latest=history.firstOrNull(),onHistory={route("history")})
                             Text("EZ · نقل محلي مشفّر · موافقتك أولًا",Modifier.fillMaxWidth().padding(top=18.dp),textAlign=TextAlign.Center,fontSize=9.sp,color=p.muted)
                         }
                         "files"->{
@@ -106,14 +106,12 @@ import java.util.Locale
                                     if(now<state.pairingExpiry){if(addresses.size>1)ChoiceMenu(qrAddress,addresses){qrAddress=it};ReceiverQr(com.ezshare.core.PairingQr(qrAddress,state.port,state.pairingNonce,state.pairingExpiry).encode());Text("ينتهي خلال ${state.pairingExpiry-now} ث",fontSize=10.sp,color=p.muted)}else EzNotice("انتهت صلاحية QR. أوقف الاستقبال وأعد تفعيله لتوليد جلسة جديدة.")
                                 }else Text("فعّل الاستقبال لإظهار رمز QR محلي",fontSize=10.sp,color=p.muted)
                             }
-                            EzButton(if(state.folder==null)"اختيار مجلد الحفظ" else "تغيير مجلد الحفظ",onFolder,Modifier.fillMaxWidth().padding(top=12.dp),enabled=!state.busy&&!state.listening,outline=true)
-                            if(state.folder!=null)Text("مجلد محلي محدد · لا يُحفظ ملف قبل موافقتك",Modifier.padding(top=8.dp),fontSize=10.sp,color=p.muted)
-                            if(!state.listening)EzButton("تفعيل الاستقبال",onReceive,Modifier.fillMaxWidth().padding(top=16.dp,bottom=16.dp),enabled=state.folder!=null&&!state.busy)
+                            if(!state.listening)EzButton("تفعيل الاستقبال",onReceive,Modifier.fillMaxWidth().padding(top=16.dp,bottom=16.dp),enabled=!state.busy)
                             else{
                                 Column(Modifier.fillMaxWidth().padding(vertical=16.dp).clip(RoundedCornerShape(18.dp)).background(p.soft).padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("العنوان اليدوي للمُرسل",fontSize=12.sp);SelectionContainer{Column{addresses.forEach{Text("$it:${state.port}",fontWeight=FontWeight.SemiBold,fontSize=18.sp)}}};if(addresses.isEmpty())Text("لا يظهر عنوان Wi-Fi. اتصل بشبكة محلية أولًا.",fontSize=12.sp);Text("سيظهر طلب القبول ورمز المقارنة هنا.",fontSize=10.sp,color=p.muted)}
                                 EzButton("إيقاف الاستقبال",onCancel,Modifier.fillMaxWidth().padding(bottom=16.dp),outline=true)
                             }
-                            EzNotice("اختر مجلدًا محليًا فرعيًا مثل Documents/EZ. النقل يحتاج هاتفين على الشبكة نفسها؛ لا يحتاج إنترنت.")
+                            EzNotice("تُحفظ الملفات تلقائيًا في Download/EZ بعد موافقتك والتحقق من سلامتها. النقل محلي ولا يحتاج إنترنت.")
                         }
                         "scanner"->{EzBadge("QR · اقتران محلي");Text("قرّب الرمز.",style=MaterialTheme.typography.headlineLarge);PairingScanner{qr->route("transfer");onScan(qr)};EzButton("اختيار جهاز قريب",{route("discover")},Modifier.fillMaxWidth().padding(top=24.dp),outline=true);Spacer(Modifier.height(16.dp));EzNotice("الرمز يحدد جلسة محلية فقط. قارن رمز التحقق ووافق على الهاتفين.")}
                         "confirm"->{
@@ -140,7 +138,10 @@ import java.util.Locale
                                 EzDevice(r.peer,if(r.incoming)"استقبلت من" else "أرسلت إلى",1)
                                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(25.dp)).background(p.soft).padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){Text(statusLabel(r.status),fontSize=17.sp,fontWeight=FontWeight.SemiBold);Text(dateLabel(r.date),fontSize=12.sp,color=p.muted);Text("ملف واحد · ${humanSize(r.total)}",fontSize=12.sp);Text("المدة النشطة: ${"%.2f".format(Locale.US,r.duration)} ث",fontSize=12.sp);Text("متوسط السرعة: ${if(r.duration>0)"%.2f MB/s".format(Locale.US,r.bytes/r.duration/1e6) else "غير متاح"}",fontSize=12.sp);if(r.sha.isNotBlank())SelectionContainer{Text("SHA-256\n${r.sha}",fontSize=10.sp,lineHeight=18.sp)}}
                                 FileRow(r.name,"${humanSize(r.bytes)} · ${statusLabel(r.status)}",R.drawable.ic_file_text,r.status=="completed",null)
-                                EzButton("مشاركة الملف مرة أخرى",{openFiles();onPick()},Modifier.fillMaxWidth().padding(top=24.dp),outline=true)
+                                if(r.incoming&&r.status=="completed"&&r.savedAt.isNotBlank()){
+                                    EzButton("فتح الملف",{onOpenReceived(r)},Modifier.fillMaxWidth().padding(top=24.dp))
+                                    EzButton("مشاركة الملف",{onShareReceived(r)},Modifier.fillMaxWidth().padding(top=12.dp),outline=true)
+                                }else EzButton("مشاركة الملف مرة أخرى",{openFiles();onPick()},Modifier.fillMaxWidth().padding(top=24.dp),outline=true)
                                 if(r.status!="completed"){Spacer(Modifier.height(16.dp));EzNotice("إعادة المحاولة تبدأ نقلًا جديدًا. الاستئناف من إزاحة سابقة غير متاح في هذه النسخة.")}
                             }
                         }
