@@ -18,3 +18,8 @@ Next essential owner input after code validation: persistent signing credentials
 Owner confirmed no existing production signing key. Added intentional manual first-key setup to the existing Android workflow, an encrypted PKCS12 backup generator and three tests (missing password, existing-key refusal, encrypted round trip / wrong-password / overwrite protection). The owner must enter a new long random password directly in Actions Secrets before generation. No production key has been generated yet; no signed APK or official release is claimed. The latest application binary/source remains the previously validated 73fd182 candidate; these changes affect signing infrastructure/docs only.
 
 The publisher now accepts the exact successful manual signed-candidate artifact from android.yml as well as release.yml, preserving all binary/hash/certificate/source/two-device acceptance checks. This lets the first candidate be tested from the existing branch without rebuilding it after acceptance.
+
+
+## Production signing identity created (18 October 2026)
+
+Owner explicitly approved creation and seven-day encrypted backup upload on the public repository. Run39137952284 succeeded; encrypted backup integrity, public certificate and encoded-keystore consistency were verified. Public identity is in PRODUCTION-IDENTITY.json; private bytes remain outside source. Persistent keystore Secret is not yet configured. Added an explicit first-candidate import from the verified backup run to reuse the owner-entered password without copying private material through chat. Pinning, provenance and tamper rejection are covered by the signing-setup tests. Production signing/build and physical acceptance still must succeed before an official release can be claimed.

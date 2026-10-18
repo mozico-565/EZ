@@ -1,6 +1,6 @@
 # Production signing — owner action required
 
-The repository had no repository/environment Actions secrets when inspected. No production key has yet been generated. The first-time setup below is prepared but requires the owner password before execution. Do not substitute the development cache keystore. Keep an offline encrypted backup of the persistent release key: losing it can prevent future app updates.
+The repository had no repository/environment Actions secrets when inspected. The owner-approved first production identity was generated successfully in run39137952284. Its public certificate/provenance is recorded in PRODUCTION-IDENTITY.json. The encrypted backup has been verified and retained separately; private key/password bytes are never committed. Do not substitute the development cache keystore. Keep an offline encrypted backup of the persistent release key: losing it can prevent future app updates.
 
 In GitHub (mobile browser works): repository → Settings → Secrets and variables → Actions → New repository secret. Configure these from your existing private production keystore, outside chat:
 
@@ -38,3 +38,10 @@ The reviewed `.github/workflows/release.yml` must be available on the repository
 Repository privacy controls who can download a release. The current GitHub repository displays Public (visibility was not changed by this task). The app's official-link action does not invent public access or embed a token: it verifies an unauthenticated published non-prerelease URL before sharing. Once a real public v1.0.0 Release is published, its verified link can be shared. If privacy changes later, do not expose source automatically. Offline complete APK sharing remains independent of public links.
 
 Old Alpha0.1/0.1.1 debug installs cannot be promised an in-place production update due to different signing certificates. Preserve important app data before uninstall/reinstall. All future production updates must retain the same signing identity.
+
+
+## First signed APK from the verified encrypted backup
+
+The Android workflow has an optional `signing_backup_run_id` input. For the first candidate only, choose operation `sign`, set that input to `39137952284`, and leave confirmation empty. The existing store-password Secret is reused; the production certificate variable must already match PRODUCTION-IDENTITY.json. The job downloads the exact encrypted backup from a successful, first-attempt manual Android workflow run in this repository, checks source provenance, public certificate, encrypted-keystore hash and base64 consistency, then signs on the temporary runner. It never generates a replacement key. Temporary private material is removed after the job. Its token has only contents:read/actions:read, without Secrets-write permissions.
+
+This bootstrap is time-limited by the original **7-day** artifact retention; it is not durable CI signing storage. Retain two private encrypted backup copies and the password. Before later builds, the owner must store the backed-up `EZ_RELEASE_KEYSTORE_BASE64.txt` in the persistent `EZ_RELEASE_KEYSTORE_BASE64` Secret; with that Secret present the backup-run input is ignored. Do not change the password or run first-key generation again. This first-candidate path does not bypass the two-phone stable-publication gate.
