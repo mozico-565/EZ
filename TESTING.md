@@ -1,3 +1,9 @@
+# Current validation update
+
+Run `python3 scripts/test_release_gate.py`, `python3 scripts/test_signing_setup.py`, `./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleRelease`. Workflow also runs `:app:connectedDebugAndroidTest` on API29 and API35 with an independently signed disposable APK fixture. MediaStore/PackageManager tests use actual Android providers; transport there is loopback, not physical phone transfer. Capture evidence is uploaded per API.
+
+Physical two-phone matrix is expressly waived by the owner on 2026-10-18; do not enter fake pass results. See release/PHYSICAL-ACCEPTANCE.json. Existing history below describes the earlier candidate, not current fixed APK proof.
+
 # Current release acceptance
 
 Signed candidate run39138474099 passed 25 core, 28 Android/Compose, 4 signing-setup and 2 gate tests, plus debug/release lint and signed assembleRelease. See release/SIGNED-CANDIDATE.json for the exact binary/certificate/source. The 17-case **physical** matrix has not been performed. Install the same production-signed APK on two phones; never use a historical debug artifact for current acceptance.
