@@ -1,3 +1,5 @@
+> Historical0.1.1 design record. Current QR/browser/batch/sharing and release gate changes are documented in release/ and README.md. Original tokens/motion and navigation remain authoritative.
+
 # EZ native design correction
 
 Source: user supplied `EZ-Prototype.html`, title `EZ — النموذج التفاعلي 02`.

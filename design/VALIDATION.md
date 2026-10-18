@@ -1,3 +1,5 @@
+> Historical0.1.1 design record. Current QR/browser/batch/sharing and release gate changes are documented in release/ and README.md. Original tokens/motion and navigation remain authoritative.
+
 # Native design validation
 
 The first ordinary-source build (07b15ba, GitHub Actions run39072932603) passed core tests, native Compose render/interaction tests, Android lint and APK assembly. It generated16 native review images. This is build evidence, not physical-device validation.
