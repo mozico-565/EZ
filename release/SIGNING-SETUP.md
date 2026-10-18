@@ -1,6 +1,6 @@
 # Production signing — owner action required
 
-The repository had no repository/environment Actions secrets when inspected. No private production key was created, committed, printed or uploaded by this task. Do not substitute the development cache keystore. Keep an offline encrypted backup of the persistent release key: losing it can prevent future app updates.
+The repository had no repository/environment Actions secrets when inspected. No production key has yet been generated. The first-time setup below is prepared but requires the owner password before execution. Do not substitute the development cache keystore. Keep an offline encrypted backup of the persistent release key: losing it can prevent future app updates.
 
 In GitHub (mobile browser works): repository → Settings → Secrets and variables → Actions → New repository secret. Configure these from your existing private production keystore, outside chat:
 
@@ -15,9 +15,19 @@ Under Variables configure `EZ_RELEASE_CERT_SHA256` with the public SHA-256 certi
 
 If a production key does not exist, create and retain it under your control using Android Studio Generate Signed Bundle/APK or the JDK's official keytool, then configure the above. This is an essential owner setup, not a reason to label a debug build stable.
 
+## First-time setup (owner confirmed no existing production key)
+
+1. In repository Actions Secrets, create `EZ_RELEASE_STORE_PASSWORD` yourself. Use a password manager to generate and retain a random ASCII password of at least 32 characters with no whitespace. Do not type it in chat. It will encrypt the permanent keystore; losing this password and backup can prevent future updates.
+2. Run `android.yml` manually on `fix/native-design-parity`, operation `prepare-first-key`, confirmation `CREATE-FIRST-KEY`. This mode never builds/publishes an APK, refuses reruns and refuses an already configured keystore. Pushes and PRs cannot create a production key. If the default-branch UI cannot expose inputs, first land the reviewed workflow through the normal PR chain; do not remove the confirmation guard.
+3. Download `EZ-FIRST-KEY-ENCRYPTED-BACKUP-<run-id>` immediately. It expires after **7 days**. Keep **two private offline copies**, with the password stored separately. This is a password-encrypted PKCS12 (RSA4096, SHA256withRSA, 10000 days, PBES2 protection with 600000 iterations), not a plaintext private key. Base64 is only encoding, not additional encryption. Because this repository is public, other authenticated GitHub users may download the encrypted artifact during retention: a long random password is essential. Never publish the backup in Releases or commit it.
+4. Owner-only: copy `EZ_RELEASE_KEYSTORE_BASE64.txt` from the backup into secret `EZ_RELEASE_KEYSTORE_BASE64`; set secret `EZ_RELEASE_KEY_ALIAS` to `ez-release`; set secret `EZ_RELEASE_KEY_PASSWORD` to the same password used in step1. Keep `EZ_RELEASE_STORE_PASSWORD` unchanged. Set variable `EZ_RELEASE_CERT_SHA256` from `PUBLIC-IDENTITY.json`. Do not send these secret values in chat.
+5. Run operation `sign`. Verify the APK certificate matches the backed-up identity. Install/test the **exact signed candidate** on both phones before the release gate can pass. Once signing is configured, never run first-key preparation again.
+
+Only the encrypted keystore/base64, public certificate and public identity metadata enter the short-lived artifact. Passwords never enter artifacts, logs, command arguments or source. The workflow does not obtain Secrets-write permissions or a PAT. The owner must enter new credentials; the agent does not fill password fields. An automatic setup test generates and deletes a separate disposable identity; that test identity must never be used for production.
+
 ## Signed candidate without stable publication
 
-The existing `android.yml` workflow supports a signed-candidate job only on `workflow_dispatch`. It can be run from Actions → EZ Android validation → Run workflow → branch `fix/native-design-parity`. Ordinary pushes/PRs never access production secrets and retain contents:read. On manual execution, signing fails closed if credentials or the expected certificate are missing. Result artifact: `EZ-1.0.0-signed-candidate`, containing the non-debug APK, checksum and metadata. This is for acceptance and is not a stable GitHub Release.
+The existing `android.yml` workflow supports a signed-candidate job only on `workflow_dispatch`. It can be run from Actions → EZ Android validation → Run workflow → branch `fix/native-design-parity`. Ordinary pushes/PRs never access production secrets and retain contents:read. Choose operation `sign` (the default `validate` never signs). On signing execution, signing fails closed if credentials or the expected certificate are missing. Result artifact: `EZ-1.0.0-signed-candidate`, containing the non-debug APK, checksum and metadata. This is for acceptance and is not a stable GitHub Release.
 
 ## Publish only the tested binary
 

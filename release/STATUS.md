@@ -11,3 +11,10 @@ Synthetic JVM localhost4MB/100MB/1GB and64small-file batch timings are recorded 
 Production signing: repository/environment Actions secrets were empty when inspected. Pipeline is prepared but no production key has been supplied or used. No signed candidate/stable v1.0.0 tag/Release exists from this task. Physical matrix remains not_tested, with explicit fail-closed checks binding exact APK/certificate/source/approval. Official link remains honestly unavailable until a real published release is verified. GitHub currently displays Public; this task did not change visibility.
 
 Next essential owner input after code validation: persistent signing credentials in Actions secrets, then installation/testing of the exact signed candidate on two phones. Do not mark complete or publish stable before those gates.
+
+
+## First-time production signing preparation
+
+Owner confirmed no existing production signing key. Added intentional manual first-key setup to the existing Android workflow, an encrypted PKCS12 backup generator and three tests (missing password, existing-key refusal, encrypted round trip / wrong-password / overwrite protection). The owner must enter a new long random password directly in Actions Secrets before generation. No production key has been generated yet; no signed APK or official release is claimed. The latest application binary/source remains the previously validated 73fd182 candidate; these changes affect signing infrastructure/docs only.
+
+The publisher now accepts the exact successful manual signed-candidate artifact from android.yml as well as release.yml, preserving all binary/hash/certificate/source/two-device acceptance checks. This lets the first candidate be tested from the existing branch without rebuilding it after acceptance.
