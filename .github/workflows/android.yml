@@ -16,6 +16,10 @@ on:
         description: 'For FIRST-TIME setup only, type CREATE-FIRST-KEY'
         type: string
         default: ''
+      signing_backup_run_id:
+        description: 'First candidate only: successful first-key backup run ID (leave blank with keystore Secret)'
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -23,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    if: github.event_name != 'workflow_dispatch' || inputs.operation != 'prepare-first-key'
+    if: github.event_name != 'workflow_dispatch' || inputs.operation == 'validate'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -79,6 +83,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   signed-candidate:
+    permissions:
+      contents: read
+      actions: read
     if: github.event_name == 'workflow_dispatch' && inputs.operation == 'sign'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -94,7 +101,44 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Select persistent secret or explicitly requested owner backup
+        id: signing-source
+        env:
+          STORE_B64: ${{ secrets.EZ_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.EZ_RELEASE_STORE_PASSWORD }}
+          BACKUP_RUN: ${{ inputs.signing_backup_run_id }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          test -n "$STORE_PASSWORD" || { echo 'Production store password is missing.'; exit 1; }
+          if [ -n "$STORE_B64" ]; then
+            echo 'use_backup=false' >> "$GITHUB_OUTPUT"
+          else
+            [[ "$BACKUP_RUN" =~ ^[0-9]+$ ]] || { echo 'Configure the persistent keystore Secret or supply the successful first-key backup run ID.'; exit 1; }
+            gh api "repos/$REPOSITORY/actions/runs/$BACKUP_RUN" > key-import-run.json
+            python3 - <<'PY'
+          import json
+          r=json.load(open('key-import-run.json'))
+          assert r['conclusion']=='success' and r['event']=='workflow_dispatch'
+          assert r['path']=='.github/workflows/android.yml' and r['run_attempt']==1
+          PY
+            echo 'use_backup=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Download the already-created encrypted owner backup
+        if: steps.signing-source.outputs.use_backup == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: EZ-FIRST-KEY-ENCRYPTED-BACKUP-${{ inputs.signing_backup_run_id }}
+          run-id: ${{ inputs.signing_backup_run_id }}
+          path: ${{ runner.temp }}/ez-first-key-import
+          github-token: ${{ github.token }}
+      - name: Verify backup provenance and pinned certificate before import
+        if: steps.signing-source.outputs.use_backup == 'true'
+        env:
+          EZ_RELEASE_CERT_SHA256: ${{ vars.EZ_RELEASE_CERT_SHA256 }}
+        run: python3 scripts/load_signing_backup.py "$RUNNER_TEMP/ez-first-key-import" key-import-run.json "$RUNNER_TEMP/ez-production.jks"
       - name: Load persistent production key without logging its contents
+        if: steps.signing-source.outputs.use_backup != 'true'
         env:
           STORE_B64: ${{ secrets.EZ_RELEASE_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.EZ_RELEASE_STORE_PASSWORD }}
@@ -116,7 +160,24 @@ jobs:
           EZ_RELEASE_KEY_PASSWORD: ${{ secrets.EZ_RELEASE_KEY_PASSWORD || secrets.EZ_RELEASE_STORE_PASSWORD }}
         run: |
           chmod +x gradlew
+          python3 scripts/test_release_gate.py
+          python3 scripts/test_signing_setup.py
           ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleRelease
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: EZ-signed-candidate-test-and-lint-reports
+          path: |
+            core/build/reports/tests/
+            app/build/reports/tests/
+            app/build/reports/lint-results-*
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: EZ-signed-candidate-native-captures
+          path: app/build/outputs/roborazzi/
+          if-no-files-found: warn
       - name: Verify installable signed APK and production certificate
         env:
           EZ_RELEASE_CERT_SHA256: ${{ vars.EZ_RELEASE_CERT_SHA256 }}
@@ -132,7 +193,9 @@ jobs:
           if-no-files-found: error
       - name: Remove runner-local private key
         if: always()
-        run: rm -f "$RUNNER_TEMP/ez-production.jks"
+        run: |
+          rm -f "$RUNNER_TEMP/ez-production.jks"
+          rm -rf "$RUNNER_TEMP/ez-first-key-import"
   prepare-first-key:
     if: github.event_name == 'workflow_dispatch' && inputs.operation == 'prepare-first-key'
     runs-on: ubuntu-24.04
@@ -169,7 +232,7 @@ jobs:
           with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
               f.write('## First-time EZ production identity\nEncrypted backup artifact expires in 7 days. Save TWO private offline copies now.\n\n')
               f.write('Public certificate SHA-256: `'+identity['certificate_sha256']+'`\n\n')
-              f.write('Owner: put backup BASE64 text into EZ_RELEASE_KEYSTORE_BASE64, alias ez-release into EZ_RELEASE_KEY_ALIAS, and the same owner password into EZ_RELEASE_KEY_PASSWORD. Set variable EZ_RELEASE_CERT_SHA256 to the public fingerprint. Never paste private material in chat.\n')
+              f.write('Keep two private encrypted backups. Configure EZ_RELEASE_KEYSTORE_BASE64 for permanent CI storage. Alias defaults to ez-release and entry password defaults to the saved store password. Set variable EZ_RELEASE_CERT_SHA256 to the public fingerprint. Never paste private material in chat.\n')
           PY
       - name: Remove runner-local signing material
         if: always()
