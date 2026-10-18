@@ -1,0 +1,28 @@
+{
+  "completed": false,
+  "tested_at": "",
+  "tested_by": "",
+  "devices": [],
+  "apk_sha256": "",
+  "certificate_sha256": "",
+  "source_fingerprint": "",
+  "results": {
+    "discovery": "not_tested",
+    "qr_camera_both_directions": "not_tested",
+    "manual_connection": "not_tested",
+    "approve_reject": "not_tested",
+    "single_4mb": "not_tested",
+    "single_100mb": "not_tested",
+    "single_1gb": "not_tested",
+    "multiple_files": "not_tested",
+    "duplicate_names": "not_tested",
+    "interruption_cleanup": "not_tested",
+    "sha256_integrity": "not_tested",
+    "media_permissions_denied_partial": "not_tested",
+    "camera_permission_denied": "not_tested",
+    "apk_share_read_access": "not_tested",
+    "shared_apk_install": "not_tested",
+    "light_dark_small_screen": "not_tested",
+    "background_transfer": "not_tested"
+  }
+}

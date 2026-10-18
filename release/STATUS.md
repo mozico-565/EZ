@@ -1,7 +1,13 @@
-# EZ 1.0.0 release work
+# EZ 1.0.0 release work — gates still closed
 
-Authoritative execution brief: MASTER-PROMPT.md. Continue PR #2 at 7445daef30b80d1cab9a354b1a0b649b0345cdff; do not reset to the historical failing commit. Existing CI is green (31 tests, run39091776955). Do not change fixed navigation/scroll behavior.
+Continued PR2 at7445dae (historical home failure already fixed). Existing main/alpha branches are preserved; work remains on fix/native-design-parity, no force-push or blind merge. Capsule navigation/scrolling unchanged.
 
-In progress: header dark integration, corrected layered Receive vector, native sharing, MediaStore/SAF browser, QR, versioned batch transfers, timing and release pipeline.
+Implemented in source: transparent/themed header mark, corrected Receive vector, complete verified APK export/sharesheet, official-release link verification, MediaStore/authorized-folder browser with7categories/search/sort/thumbnails/multi-select, CameraX/ZXing local QR and strict payload validation, protocol2 approved batch transfer, per-file receipts/partial safety/history, stage timings and release gates.
 
-Stable publication gates remain closed until all required tests pass, a persistent production signing identity is configured, and the physical two-phone matrix is completed. No production keystore exists in the source. No stable v1.0.0 tag or public release should be created while gates are unmet.
+Evidence so far: original12 core tests plus13 batch/QR tests pass locally. First integrated Android release build8d9b82f passed run39096801377, including Android tests, debug/release lint and assembleRelease. Later selection/scanner/gate tests and final refinements are being validated in the next run. Native captures are review images, not physical-camera proof.
+
+Synthetic JVM localhost4MB/100MB/1GB and64small-file batch timings are recorded with source and limitations. No device/radio benchmarks or fixed2second promise.
+
+Production signing: repository/environment Actions secrets were empty when inspected. Pipeline is prepared but no production key has been supplied or used. No signed candidate/stable v1.0.0 tag/Release exists from this task. Physical matrix remains not_tested, with explicit fail-closed checks binding exact APK/certificate/source/approval. Official link remains honestly unavailable until a real published release is verified. GitHub currently displays Public; this task did not change visibility.
+
+Next essential owner input after code validation: persistent signing credentials in Actions secrets, then installation/testing of the exact signed candidate on two phones. Do not mark complete or publish stable before those gates.
