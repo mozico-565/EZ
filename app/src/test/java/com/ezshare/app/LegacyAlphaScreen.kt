@@ -40,7 +40,6 @@ private val Purple=Color(0xffbaa3f6);private val Orange=Color(0xffffc568);privat
     val controller=vm.controller;val state by vm.ui.collectAsStateWithLifecycle();var address by rememberSaveable{mutableStateOf("")};var tab by rememberSaveable{mutableIntStateOf(0)}
     val context=androidx.compose.ui.platform.LocalContext.current
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){it?.let(controller::pick)}
-    val folderPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()){it?.let(controller::folder)}
     val notifications=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){granted->if(!granted)Toast.makeText(context,"يمكن متابعة النقل؛ قد يُخفي النظام الإشعار",Toast.LENGTH_LONG).show()}
     fun notifyPermission(){if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)notifications.launch(Manifest.permission.POST_NOTIFICATIONS)}
     fun openSend(){tab=1;controller.page("send")}
@@ -88,9 +87,7 @@ private val Purple=Color(0xffbaa3f6);private val Orange=Color(0xffffc568);privat
                     "receive"->{
                         Text("جاهز للاستقبال",fontSize=26.sp,fontWeight=FontWeight.Bold)
                         Text("جهازك: ${controller.identity}")
-                        OutlinedButton(onClick={folderPicker.launch(null)},enabled=!state.busy&&!state.listening,modifier=Modifier.fillMaxWidth()){Text(if(state.folder==null)"اختر مجلد الحفظ داخل المستندات" else "تغيير مجلد الحفظ")}
-                        if(state.folder!=null)Text("مجلد الحفظ محدد. يلزم دعمه لإنشاء الملفات وإعادة تسميتها.",fontSize=12.sp)
-                        Button(onClick={notifyPermission();controller.receive()},enabled=state.folder!=null&&!state.listening&&!state.busy,modifier=Modifier.fillMaxWidth()){Text("تفعيل الاستقبال")}
+                        Button(onClick={notifyPermission();controller.receive()},enabled=!state.listening&&!state.busy,modifier=Modifier.fillMaxWidth()){Text("تفعيل الاستقبال")}
                         if(state.listening){Surface(color=Blue,shape=RoundedCornerShape(25.dp)){Column(Modifier.fillMaxWidth().padding(20.dp)){Text("العنوان اليدوي للمُرسل",fontWeight=FontWeight.Bold);controller.localAddresses().forEach{ip->SelectionContainerCompat("$ip:${state.port}")};if(controller.localAddresses().isEmpty())Text("لا يظهر عنوان Wi-Fi. اتصل بشبكة محلية أولًا.");Text("ستُطلب موافقتك عند وصول ملف.",fontSize=12.sp)}}
                             OutlinedButton(onClick={controller.cancel()},modifier=Modifier.fillMaxWidth()){Text("إيقاف الاستقبال والنقل")}
                         }
