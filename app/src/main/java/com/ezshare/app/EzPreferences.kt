@@ -13,5 +13,9 @@ class EzLocalStore(context:Context){
     fun read()=EzPreferences(prefs.getString("name",Build.MODEL.take(28)).orEmpty(),prefs.getInt("avatar",0),prefs.getString("theme","light").orEmpty(),prefs.getBoolean("quiet",false))
     fun save(p:EzPreferences){prefs.edit().putString("name",p.name).putInt("avatar",p.avatar).putString("theme",p.theme).putBoolean("quiet",p.quiet).apply()}
     fun history():List<HistoryEntry> = runCatching {val a=JSONArray(prefs.getString("history","[]"));(0 until a.length()).map{val j=a.getJSONObject(it);HistoryEntry(j.getString("id"),j.getString("name"),j.getLong("bytes"),j.getLong("total"),j.getDouble("duration"),j.optString("sha"),j.getString("peer"),j.getBoolean("incoming"),j.getString("status"),j.getLong("date"),j.optString("savedAt"))}}.getOrDefault(emptyList())
-    fun saveHistory(rows:List<HistoryEntry>){val a=JSONArray();rows.take(100).forEach{r->a.put(JSONObject().put("id",r.id).put("name",r.name).put("bytes",r.bytes).put("total",r.total).put("duration",r.duration).put("sha",r.sha).put("peer",r.peer).put("incoming",r.incoming).put("status",r.status).put("date",r.date).put("savedAt",r.savedAt))};prefs.edit().putString("history",a.toString()).apply()}
+    fun observeHistory(listener:android.content.SharedPreferences.OnSharedPreferenceChangeListener){prefs.registerOnSharedPreferenceChangeListener(listener)}
+    fun stopObservingHistory(listener:android.content.SharedPreferences.OnSharedPreferenceChangeListener){prefs.unregisterOnSharedPreferenceChangeListener(listener)}
+    fun addHistory(row:HistoryEntry){synchronized(historyLock){saveHistory((listOf(row)+history().filter{it.id!=row.id}).take(100))}}
+    fun saveHistory(rows:List<HistoryEntry>){synchronized(historyLock){val a=JSONArray();rows.take(100).forEach{r->a.put(JSONObject().put("id",r.id).put("name",r.name).put("bytes",r.bytes).put("total",r.total).put("duration",r.duration).put("sha",r.sha).put("peer",r.peer).put("incoming",r.incoming).put("status",r.status).put("date",r.date).put("savedAt",r.savedAt))};prefs.edit().putString("history",a.toString()).apply()}}
+    companion object{private val historyLock=Any()}
 }

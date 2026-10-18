@@ -29,6 +29,7 @@ data class TransferUi(
     val incoming:Boolean=false,val peer:String="",val operation:String="",val files:List<Metadata> = emptyList(),val completedResults:List<Result> = emptyList(),val fileIndex:Int=0,val phase:String="",val timings:List<PhaseTiming> = emptyList(),val pairingNonce:String="",val pairingExpiry:Long=0,val peers:List<Peer> = emptyList(),val discoveryMessage:String="", val busy:Boolean=false
 )
 class TransferController(private val app:Application) {
+    private val store=EzLocalStore(app)
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private val _ui=MutableStateFlow(TransferUi());val ui=_ui.asStateFlow()
     private val inUse=AtomicBoolean(false)
@@ -42,7 +43,7 @@ class TransferController(private val app:Application) {
     @Volatile private var discoveryStart=0L
     @Volatile private var discoveryLatency=0L
     private val discovery=Discovery(app,{ peers->if(peers.isNotEmpty()&&discoveryStart>0&&discoveryLatency==0L)discoveryLatency=System.nanoTime()-discoveryStart;_ui.update { it.copy(peers=peers) } },{ message->_ui.update { it.copy(discoveryMessage=message) } })
-    val identity:String get()=EzLocalStore(app).read().name.ifBlank{Build.MODEL}.take(48)
+    val identity:String get()=store.read().name.ifBlank{Build.MODEL}.take(48)
     fun status(s:String){_ui.update{it.copy(status=s)}}
     fun page(s:String){_ui.update{it.copy(stage=s)}}
     fun pick(uri:Uri){try{
@@ -81,7 +82,7 @@ class TransferController(private val app:Application) {
             _ui.update{it.copy(pairingNonce=nonce,pairingExpiry=expiry,listening=true,port=listener.localPort,status="بانتظار طلب · قارن الرمز قبل القبول",error=null,stage="receive",result=null)}
             while(!listener.isClosed){val socket=listener.accept();if(!inUse.compareAndSet(false,true)){socket.close();continue}
                 scope.launch { val c=Connection(socket);connection=c
-                    try{if(cancellationRequested)throw IOException("Cancelled");_ui.update{it.copy(operation=UUID.randomUUID().toString(),completedResults=emptyList(),timings=emptyList(),files=emptyList(),fileIndex=0,busy=true,progress=null,result=null,error=null,incoming=true,peer="")}
+                    try{if(cancellationRequested)throw IOException("Cancelled");_ui.update{it.copy(operation=UUID.randomUUID().toString(),completedResults=emptyList(),timings=emptyList(),files=emptyList(),filename="",fileIndex=0,busy=true,progress=null,result=null,error=null,incoming=true,peer="")}
                         val result=BatchEngine.receive(c,identity,if(System.currentTimeMillis()/1000<expiry)nonce else "",{m,peer,sas->
                             if(m.pairingNonce.isNotBlank()&&System.currentTimeMillis()/1000>=expiry)throw ProtocolException("QR session expired")
                             ask(peer,sas,m.files.firstOrNull(),true,m.files)
@@ -105,13 +106,15 @@ class TransferController(private val app:Application) {
         }catch(e:Exception){fail(e)}finally{runCatching{activeStream?.close()};activeStream=null;connection?.close();connection=null;inUse.set(false);_ui.update{it.copy(busy=false)};stopForeground()}}
     }
     private fun batchProgress(p:BatchProgress){_ui.update{it.copy(progress=p.overall,fileIndex=p.index,phase=p.stage,filename=p.name,status=when(p.stage){"verifying"->"جارٍ التحقق من الملف المحفوظ…";"preparing"->"جارٍ تجهيز الملف…";else->"جارٍ النقل الفعلي…"},stage="transfer")}}
-    private fun completed(r:Result){_ui.update{it.copy(completedResults=it.completedResults+r)}}
+    private fun completed(r:Result){val s=_ui.value;store.addHistory(HistoryEntry(id=s.operation+":"+s.completedResults.size+":completed",name=r.metadata.name,bytes=r.bytes,total=r.metadata.size,duration=r.elapsedNanos/1e9,sha=r.sha256,peer=s.peer,incoming=s.incoming,status="completed",savedAt=r.savedAt));_ui.update{it.copy(completedResults=it.completedResults+r)}}
+    private fun recordFailure(){val s=_ui.value;if(!s.busy||s.filename.isBlank())return;val completedBytes=s.completedResults.sumOf{it.bytes};val completedTime=s.completedResults.sumOf{it.elapsedNanos};store.addHistory(HistoryEntry(id=s.operation+":"+s.fileIndex+":failed",name=s.filename,bytes=((s.progress?.bytes?:0)-completedBytes).coerceAtLeast(0),total=s.files.getOrNull(s.fileIndex)?.size?:-1,duration=((s.progress?.elapsedNanos?:0)-completedTime).coerceAtLeast(0)/1e9,peer=s.peer,incoming=s.incoming,status=if(cancellationRequested)"cancelled" else "failed"))}
+
     private fun finishBatch(r:BatchResult){_ui.update{it.copy(result=r.files.lastOrNull(),timings=r.timings,progress=it.progress?.copy(currentMBps=0.0),status="اكتمل النقل والتحقق من جميع الملفات",request=null,error=null,stage="result")}}
     fun cancel(){cancellationRequested=true;approval?.complete(false);runCatching{activeStream?.close()};connection?.close();stopReceive();_ui.update{it.copy(status="تم الإلغاء",error=if(it.busy)"أُلغي النقل؛ لا يُعد الملف الجزئي ناجحًا." else null,request=null)} }
     fun stopReceive(){val old=synchronized(this){wantsReceive=false;server.also{server=null}};runCatching{old?.close()};discovery.stopAdvertising();_ui.update{it.copy(listening=false,port=0)};if(!inUse.get())stopForeground()}
     private fun progress(p:Progress){_ui.update{it.copy(progress=p,status="جارٍ نقل الملف الفعلي…",stage="transfer")}}
     private fun finish(result:Result){_ui.update{it.copy(progress=it.progress?.copy(total=result.bytes,currentMBps=0.0),result=result,status="اكتمل النقل والتحقق من SHA-256",request=null,error=null,stage="result")}}
-    private fun fail(e:Exception){if(cancellationRequested){_ui.update{it.copy(error="أُلغي النقل؛ لا يُعد الملف الجزئي ناجحًا.",status="تم الإلغاء",request=null)};return};_ui.update{it.copy(error=when(e){is SocketTimeoutException->"انتهت مهلة الاتصال. قرّب الهاتفين وافحص الشبكة ثم أعد المحاولة.";is ProtocolException->if(e.message?.contains("Unsupported protocol")==true)"إصدار غير متوافق. حدّث EZ على الهاتفين إلى الإصدار نفسه." else "تعذّر اعتماد النقل: ${e.message}";is TimeoutCancellationException->"انتهت مهلة موافقة المستخدم.";else->if(e.message?.contains("Incomplete file cleanup failed")==true)"تعذّر حذف الملف الجزئي. قد يبقى ملف .ezpart في مجلد الحفظ؛ احذفه يدويًا. لم يُعلن نجاحه." else "تعذّرت العملية: ${e.message?:e.javaClass.simpleName}. لم يُعلن نجاح أي ملف جزئي."},status="توقفت العملية",request=null)}}
+    private fun fail(e:Exception){recordFailure();if(cancellationRequested){_ui.update{it.copy(error="أُلغي النقل؛ لا يُعد الملف الجزئي ناجحًا.",status="تم الإلغاء",request=null)};return};_ui.update{it.copy(error=when(e){is SocketTimeoutException->"انتهت مهلة الاتصال. قرّب الهاتفين وافحص الشبكة ثم أعد المحاولة.";is ProtocolException->if(e.message?.contains("Unsupported protocol")==true)"إصدار غير متوافق. حدّث EZ على الهاتفين إلى الإصدار نفسه." else "تعذّر اعتماد النقل: ${e.message}";is TimeoutCancellationException->"انتهت مهلة موافقة المستخدم.";else->if(e.message?.contains("Incomplete file cleanup failed")==true)"تعذّر حذف الملف الجزئي. قد يبقى ملف .ezpart في مجلد الحفظ؛ احذفه يدويًا. لم يُعلن نجاحه." else "تعذّرت العملية: ${e.message?:e.javaClass.simpleName}. لم يُعلن نجاح أي ملف جزئي."},status="توقفت العملية",request=null)}}
     private fun runForeground(){TransferService.start(app)}
     private fun stopForeground(){app.stopService(Intent(app,TransferService::class.java))}
     fun serviceStopped(){if(inUse.get()||server!=null)cancel()}

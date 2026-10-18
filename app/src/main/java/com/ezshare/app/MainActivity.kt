@@ -30,16 +30,10 @@ class EZViewModel(app:Application):AndroidViewModel(app){
     private val store=EzLocalStore(app)
     private val _preferences=MutableStateFlow(store.read());val preferences=_preferences.asStateFlow()
     private val _history=MutableStateFlow(store.history());val history=_history.asStateFlow()
-    private var observedOperation="";private var observedCount=0;private var lastError:String?=null
+    private val historyListener=android.content.SharedPreferences.OnSharedPreferenceChangeListener{_,key->if(key=="history")_history.value=store.history()}
+    init{store.observeHistory(historyListener)}
     fun save(p:EzPreferences){store.save(p);_preferences.value=p}
-    fun observe(s:TransferUi){
-        if(s.error==null)lastError=null
-        if(observedOperation!=s.operation){observedOperation=s.operation;observedCount=0}
-        s.completedResults.drop(observedCount).forEach{r->add(HistoryEntry(name=r.metadata.name,bytes=r.bytes,total=r.metadata.size,duration=r.elapsedNanos/1e9,sha=r.sha256,peer=s.peer,incoming=s.incoming,status="completed",savedAt=r.savedAt))};observedCount=s.completedResults.size
-        if(s.error!=null&&s.error!=lastError&&s.filename.isNotBlank()&&s.progress!=null){lastError=s.error;val p=s.progress;val completedBytes=s.completedResults.sumOf{it.bytes};val completedNanos=s.completedResults.sumOf{it.elapsedNanos};add(HistoryEntry(name=s.filename,bytes=(p.bytes-completedBytes).coerceAtLeast(0),total=s.files.getOrNull(s.fileIndex)?.size?:p.total,duration=(p.elapsedNanos-completedNanos).coerceAtLeast(0)/1e9,peer=s.peer,incoming=s.incoming,status=if(s.status=="تم الإلغاء")"cancelled" else "failed"))}
-    }
-    private fun add(r:HistoryEntry){_history.value=(listOf(r)+_history.value).take(100);store.saveHistory(_history.value)}
-    override fun onCleared(){catalog.close();super.onCleared()}
+    override fun onCleared(){store.stopObservingHistory(historyListener);catalog.close();super.onCleared()}
     fun clearHistory(){_history.value=emptyList();store.saveHistory(emptyList())}
 }
 class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);enableEdgeToEdge();setContent{EZScreen()}}}
@@ -69,7 +63,6 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
         onDispose{}
     }
     val systemQuiet=runCatching{Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}.getOrDefault(false)
-    LaunchedEffect(state.operation,state.completedResults,state.result,state.error){vm.observe(state)}
     EzTheme(dark,prefs.quiet||systemQuiet){EzApp(state,prefs,history,addresses,
         onPick={picker.launch(arrayOf("*/*"))},onFolder={folders.launch(null)},onDiscover=controller::startDiscovery,
         onSend={notifyPermission();controller.send(it)},onReceive={notifyPermission();controller.receive()},onCancel=controller::cancel,onDecide=controller::decide,onSave=vm::save,onClearHistory=vm::clearHistory,
