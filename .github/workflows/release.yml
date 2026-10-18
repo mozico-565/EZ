@@ -97,7 +97,7 @@ jobs:
           python3 - <<'PY'
           import json
           r=json.load(open('candidate-run.json'))
-          assert r['conclusion']=='success' and r['event']=='workflow_dispatch' and r['path']=='.github/workflows/release.yml'
+          assert r['conclusion']=='success' and r['event']=='workflow_dispatch' and r['path'] in ('.github/workflows/release.yml','.github/workflows/android.yml')
           PY
       - uses: actions/download-artifact@v4
         with:

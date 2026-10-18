@@ -3,6 +3,19 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Validation, signed candidate, or FIRST-TIME production key setup'
+        type: choice
+        default: validate
+        options:
+          - validate
+          - sign
+          - prepare-first-key
+      confirmation:
+        description: 'For FIRST-TIME setup only, type CREATE-FIRST-KEY'
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -10,6 +23,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    if: github.event_name != 'workflow_dispatch' || inputs.operation != 'prepare-first-key'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -41,6 +55,7 @@ jobs:
         run: |
           chmod +x gradlew
           python3 scripts/test_release_gate.py
+          python3 scripts/test_signing_setup.py
           ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleRelease
       - uses: actions/upload-artifact@v4
         if: always()
@@ -64,7 +79,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   signed-candidate:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'sign'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -118,3 +133,44 @@ jobs:
       - name: Remove runner-local private key
         if: always()
         run: rm -f "$RUNNER_TEMP/ez-production.jks"
+  prepare-first-key:
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'prepare-first-key'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Require intentional first-time creation, never an automatic replacement
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          test "$CONFIRMATION" = 'CREATE-FIRST-KEY' && test "$RUN_ATTEMPT" = '1' || { echo 'First-time creation requires explicit confirmation; workflow reruns are refused.'; exit 1; }
+      - name: Generate password-encrypted persistent production identity
+        env:
+          EZ_RELEASE_STORE_PASSWORD: ${{ secrets.EZ_RELEASE_STORE_PASSWORD }}
+          EXISTING_RELEASE_KEY: ${{ secrets.EZ_RELEASE_KEYSTORE_BASE64 }}
+        run: python3 scripts/prepare_signing_key.py "$RUNNER_TEMP/ez-owner-backup"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EZ-FIRST-KEY-ENCRYPTED-BACKUP-${{ github.run_id }}
+          path: ${{ runner.temp }}/ez-owner-backup/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Record public certificate and backup instructions only
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          identity=json.loads((Path(os.environ['RUNNER_TEMP'])/'ez-owner-backup/PUBLIC-IDENTITY.json').read_text())
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## First-time EZ production identity\nEncrypted backup artifact expires in 7 days. Save TWO private offline copies now.\n\n')
+              f.write('Public certificate SHA-256: `'+identity['certificate_sha256']+'`\n\n')
+              f.write('Owner: put backup BASE64 text into EZ_RELEASE_KEYSTORE_BASE64, alias ez-release into EZ_RELEASE_KEY_ALIAS, and the same owner password into EZ_RELEASE_KEY_PASSWORD. Set variable EZ_RELEASE_CERT_SHA256 to the public fingerprint. Never paste private material in chat.\n')
+          PY
+      - name: Remove runner-local signing material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/ez-owner-backup"
