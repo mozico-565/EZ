@@ -20,6 +20,20 @@ class SigningSetupTest(unittest.TestCase):
                 prepare(path)
             self.assertFalse(path.exists())
 
+    def test_safe_diagnostics_distinguish_password_rules(self):
+        samples = [('', 'secret_missing'), ('a' * 31, 'length_below_32'),
+                   ('a' * 32 + '\n', 'whitespace_or_newline'),
+                   ('a' * 32 + 'ع', 'non_ASCII_characters')]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'backup'
+            for password, expected in samples:
+                with self.subTest(rule=expected), patch.dict(os.environ, {'EZ_RELEASE_STORE_PASSWORD': password, 'EXISTING_RELEASE_KEY': ''}):
+                    with self.assertRaisesRegex(ValueError, expected) as raised:
+                        prepare(path)
+                    if password:
+                        self.assertNotIn(password, str(raised.exception))
+                    self.assertFalse(path.exists())
+
     def test_refuse_replacement_of_existing_production_key(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'EZ_RELEASE_STORE_PASSWORD': secrets.token_urlsafe(48), 'EXISTING_RELEASE_KEY': 'already-present'}):
             with self.assertRaises(ValueError):

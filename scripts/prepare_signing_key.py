@@ -11,8 +11,19 @@ import tempfile
 
 def prepare(output: Path):
     password = os.environ.get('EZ_RELEASE_STORE_PASSWORD', '')
-    if len(password) < 32 or not password.isascii() or any(c.isspace() for c in password):
-        raise ValueError('Use a password-manager-generated ASCII password of at least 32 characters without whitespace.')
+    problems = []
+    if not password:
+        problems.append('secret_missing')
+    else:
+        if len(password) < 32:
+            problems.append('length_below_32')
+        if not password.isascii():
+            problems.append('non_ASCII_characters')
+        if any(c.isspace() for c in password):
+            problems.append('whitespace_or_newline')
+    if problems:
+        # Report only failed rules, never contents, positions or actual length.
+        raise ValueError('Signing password rejected: ' + ', '.join(problems) + '. Update EZ_RELEASE_STORE_PASSWORD directly in GitHub Secrets; do not post its value.')
     if os.environ.get('EXISTING_RELEASE_KEY', ''):
         raise ValueError('A production keystore secret already exists. Refusing to generate a replacement identity.')
     # Exclusive directory creation also prevents accidental overwriting of a local backup.
