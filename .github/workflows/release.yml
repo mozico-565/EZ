@@ -129,5 +129,5 @@ jobs:
           source_commit=$(python3 -c "import json;print(json.load(open('candidate/build-metadata.json'))['source_commit'])")
           git tag v1.0.0 "$source_commit"
           git push origin refs/tags/v1.0.0
-          gh release create v1.0.0 candidate/EZ-1.0.0.apk candidate/SHA256SUMS.txt candidate/build-metadata.json --verify-tag --title 'EZ 1.0.0' --notes-file release/RELEASE-NOTES.md
+          gh release create v1.0.0 candidate/EZ-1.0.0.apk candidate/SHA256SUMS.txt candidate/build-metadata.json release/PHYSICAL-ACCEPTANCE.json release/TEST-EVIDENCE.md --verify-tag --title 'EZ 1.0.0' --notes-file release/RELEASE-NOTES.md
           gh release view v1.0.0 --json url,tagName,isDraft,isPrerelease
