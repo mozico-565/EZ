@@ -36,9 +36,10 @@ class EZViewModel(app:Application):AndroidViewModel(app){
         if(s.error==null)lastError=null
         if(observedOperation!=s.operation){observedOperation=s.operation;observedCount=0}
         s.completedResults.drop(observedCount).forEach{r->add(HistoryEntry(name=r.metadata.name,bytes=r.bytes,total=r.metadata.size,duration=r.elapsedNanos/1e9,sha=r.sha256,peer=s.peer,incoming=s.incoming,status="completed",savedAt=r.savedAt))};observedCount=s.completedResults.size
-        if(s.error!=null&&s.error!=lastError&&s.filename.isNotBlank()&&s.progress!=null){lastError=s.error;val p=s.progress;add(HistoryEntry(name=s.filename,bytes=p.bytes,total=p.total,duration=p.elapsedNanos/1e9,peer=s.peer,incoming=s.incoming,status=if(s.status=="تم الإلغاء")"cancelled" else "failed"))}
+        if(s.error!=null&&s.error!=lastError&&s.filename.isNotBlank()&&s.progress!=null){lastError=s.error;val p=s.progress;val completedBytes=s.completedResults.sumOf{it.bytes};val completedNanos=s.completedResults.sumOf{it.elapsedNanos};add(HistoryEntry(name=s.filename,bytes=(p.bytes-completedBytes).coerceAtLeast(0),total=s.files.getOrNull(s.fileIndex)?.size?:p.total,duration=(p.elapsedNanos-completedNanos).coerceAtLeast(0)/1e9,peer=s.peer,incoming=s.incoming,status=if(s.status=="تم الإلغاء")"cancelled" else "failed"))}
     }
     private fun add(r:HistoryEntry){_history.value=(listOf(r)+_history.value).take(100);store.saveHistory(_history.value)}
+    override fun onCleared(){catalog.close();super.onCleared()}
     fun clearHistory(){_history.value=emptyList();store.saveHistory(emptyList())}
 }
 class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);enableEdgeToEdge();setContent{EZScreen()}}}
@@ -50,11 +51,10 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
     val addresses=remember(networkTick,state.port){controller.localAddresses()}
     val catalog by vm.catalog.state.collectAsStateWithLifecycle()
     val scope=rememberCoroutineScope()
-    var actionMessage by remember{mutableStateOf("")}
-    fun message(s:String){Toast.makeText(context,s,Toast.LENGTH_LONG).show();actionMessage=s}
+    fun message(s:String){Toast.makeText(context,s,Toast.LENGTH_LONG).show()}
     fun toggle(file:LocalFile){if(controller.ui.value.busy)return;if(file.unavailable.isNotBlank()){message(file.unavailable);return};scope.launch{
         try{val current=controller.ui.value.selected;val existing=current.firstOrNull{it.uri==file.uri||file.packageName.isNotBlank()&&it.uri.lastPathSegment?.startsWith(file.packageName+"-")==true}
-            if(existing!=null)controller.select(current-existing) else {val picked=if(file.packageName.isNotBlank())kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){val apk=ApkSharing.export(context,file.packageName);PickedFile(android.net.Uri.fromFile(apk),file.metadata.copy(size=apk.length()))} else PickedFile(file.uri,file.metadata);controller.select(current+picked)}
+            if(existing!=null)controller.select(current-existing) else {val picked=if(file.packageName.isNotBlank())kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){val apk=ApkSharing.export(context,file.packageName);PickedFile(android.net.Uri.fromFile(apk),file.metadata.copy(size=apk.length()))} else PickedFile(file.uri,file.metadata);controller.select(controller.ui.value.selected+picked)}
         }catch(e:Exception){message(e.message?:"تعذّر اختيار الملف")}
     }}
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()){vm.catalog.import(it)}
@@ -74,7 +74,7 @@ class MainActivity:ComponentActivity(){override fun onCreate(savedInstanceState:
         onPick={picker.launch(arrayOf("*/*"))},onFolder={folders.launch(null)},onDiscover=controller::startDiscovery,
         onSend={notifyPermission();controller.send(it)},onReceive={notifyPermission();controller.receive()},onCancel=controller::cancel,onDecide=controller::decide,onSave=vm::save,onClearHistory=vm::clearHistory,
         catalog=catalog,onToggle=::toggle,onMany={files,select->
-            if(select){val combined=(state.selected+files.map{PickedFile(it.uri,it.metadata)}).distinctBy{it.uri};if(combined.size>256)message("حد العملية 256 ملفًا؛ قلّل التحديد") else scope.launch{try{val prepared=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){files.map{f->if(f.packageName.isBlank())PickedFile(f.uri,f.metadata) else {val apk=ApkSharing.export(context,f.packageName);PickedFile(android.net.Uri.fromFile(apk),f.metadata.copy(size=apk.length()))}}};controller.select((state.selected+prepared).distinctBy{it.uri})}catch(e:Exception){message(e.message?:"تعذّر تجهيز التطبيقات")}}}else controller.select(state.selected.filter{f->files.none{it.uri==f.uri||it.packageName.isNotBlank()&&f.uri.lastPathSegment?.startsWith(it.packageName+"-")==true}})
+            if(select){val combined=(state.selected+files.map{PickedFile(it.uri,it.metadata)}).distinctBy{it.uri};if(combined.size>256)message("حد العملية 256 ملفًا؛ قلّل التحديد") else scope.launch{try{val prepared=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){files.map{f->if(f.packageName.isBlank())PickedFile(f.uri,f.metadata) else {val apk=ApkSharing.export(context,f.packageName);PickedFile(android.net.Uri.fromFile(apk),f.metadata.copy(size=apk.length()))}}};controller.select((controller.ui.value.selected+prepared).distinctBy{it.uri})}catch(e:Exception){message(e.message?:"تعذّر تجهيز التطبيقات")}}}else controller.select(state.selected.filter{f->files.none{it.uri==f.uri||it.packageName.isNotBlank()&&f.uri.lastPathSegment?.startsWith(it.packageName+"-")==true}})
         },onBrowseFolder={browseFolders.launch(null)},onMediaPermission={mediaPermission.launch(vm.catalog.permissions())},onCatalogRefresh=vm.catalog::refresh,onOpenDirectory=vm.catalog::open,onCatalogUp=vm.catalog::up,onDeviceFiles=vm.catalog::device,
         permissionNote=vm.catalog.permissionNote(),onScan={notifyPermission();controller.scan(it)},
         onPreview={f->runCatching{if(f.packageName.isNotBlank())message(f.unavailable.ifBlank{f.metadata.name+" · APK كامل قابل للمشاركة"}) else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(f.uri,f.metadata.mime).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))}.onFailure{message("لا يوجد تطبيق مناسب للمعاينة")}},

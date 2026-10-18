@@ -22,6 +22,7 @@ data class CatalogState(val files:List<LocalFile> = emptyList(),val loading:Bool
 class FileCatalog(private val app:Application){
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO);private val _state=MutableStateFlow(CatalogState());val state=_state.asStateFlow()
     private var task:Job?=null;private var tree:Uri?=null;private val parents=mutableListOf<Pair<Uri,String>>();private var extras=listOf<LocalFile>()
+    fun close(){scope.cancel()}
     fun import(uris:List<Uri>){scope.launch{extras=(extras+uris.mapNotNull{u->runCatching{app.contentResolver.takePersistableUriPermission(u,Intent.FLAG_GRANT_READ_URI_PERMISSION)};runCatching{app.contentResolver.query(u,arrayOf("_display_name","_size"),null,null,null)?.use{c->if(!c.moveToFirst())return@use null;LocalFile(u,Metadata(c.getString(0)?:"file",app.contentResolver.getType(u)?:"application/octet-stream",if(c.isNull(1))-1 else c.getLong(1)))}}.getOrNull()}).distinctBy{it.key};refresh()}}
     fun openTree(uri:Uri){runCatching{app.contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)};tree=uri;parents.clear();parents+=DocumentsContract.buildDocumentUriUsingTree(uri,DocumentsContract.getTreeDocumentId(uri)) to "مجلد مصرح به";refresh()}
     fun open(file:LocalFile){if(file.directory){parents+=file.uri to file.metadata.name;refresh()}}
