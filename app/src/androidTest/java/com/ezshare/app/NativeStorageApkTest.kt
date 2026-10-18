@@ -47,5 +47,22 @@ class NativeStorageApkTest {
             try{java.net.Socket(java.net.InetAddress.getLoopbackAddress(),listener.localPort).use{socket->com.ezshare.core.Connection(socket,5000).use{connection->val result=com.ezshare.core.BatchEngine.send(connection,"sender",com.ezshare.core.Manifest(listOf(Metadata("third-party.apk",ApkSharing.APK_MIME,payload.size.toLong()))),listOf({java.io.ByteArrayInputStream(payload)}),{_,_,sas->assertEquals(sas,codes.poll(3,java.util.concurrent.TimeUnit.SECONDS));true});assertEquals(payload.size.toLong(),result.files.single().bytes)}};task.get(10,java.util.concurrent.TimeUnit.SECONDS);assertTrue(committed);assertArrayEquals(payload,collected.toByteArray())}finally{listener.close();pool.shutdownNow()}
         }
     }
-    @Test fun nativeSharesheetLaunchesForEzApk(){val apk=ApkSharing.export(context);InstrumentationRegistry.getInstrumentation().runOnMainSync{ApkSharing.share(context,apk)};Thread.sleep(700);val automation=InstrumentationRegistry.getInstrumentation().uiAutomation;val root=automation.rootInActiveWindow;assertNotNull(root);assertNotEquals(context.packageName,root.packageName?.toString());val capture=automation.takeScreenshot();assertNotNull(capture);File(context.getExternalFilesDir(null),"native-apk-sharesheet.png").outputStream().use{capture.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)};automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)}
+    @Test fun nativeSharesheetLaunchesForEzApk(){
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val activity=instrumentation.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try{
+            val apk=ApkSharing.export(context)
+            instrumentation.runOnMainSync{ApkSharing.share(context,apk)}
+            instrumentation.waitForIdleSync()
+            val automation=instrumentation.uiAutomation
+            var root=automation.rootInActiveWindow
+            val deadline=System.currentTimeMillis()+5000
+            while(root?.packageName?.toString() !in listOf("android","com.android.intentresolver")&&System.currentTimeMillis()<deadline){Thread.sleep(100);root=automation.rootInActiveWindow}
+            assertNotNull(root)
+            assertTrue("Actual Android chooser must be foreground",root!!.packageName.toString() in listOf("android","com.android.intentresolver"))
+            val capture=automation.takeScreenshot();assertNotNull(capture)
+            File(context.getExternalFilesDir(null),"native-apk-sharesheet.png").outputStream().use{capture.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
+            automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        }finally{instrumentation.runOnMainSync{activity.finish()}}
+    }
 }
