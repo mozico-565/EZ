@@ -1,0 +1,27 @@
+# Default-branch manual entry only. Application source stays on the reviewed PR branch.
+name: EZ Release tools
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Select branch fix/native-design-parity, then choose operation'
+        type: choice
+        default: validate
+        options:
+          - validate
+          - sign
+          - prepare-first-key
+      confirmation:
+        description: 'For FIRST-TIME setup only, type CREATE-FIRST-KEY'
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  choose-working-branch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Default-branch launcher does not create keys or publish
+        run: |
+          echo 'Select fix/native-design-parity in Run workflow to execute the reviewed implementation.'
+          echo 'No application sources are merged by this launcher. No secrets are loaded here.'
