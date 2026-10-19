@@ -54,7 +54,7 @@ class NetworkPeerHarnessTest {
                 }
                 val s=controller.ui.value
                 val history=EzLocalStore(app).history()
-                JSONObject().put("ok",true).put("busy",s.busy).put("listening",s.listening).put("port",s.port).put("nonce",s.pairingNonce).put("expiry",s.pairingExpiry)
+                JSONObject().put("ok",true).put("epoch",System.currentTimeMillis()/1000).put("busy",s.busy).put("listening",s.listening).put("port",s.port).put("nonce",s.pairingNonce).put("expiry",s.pairingExpiry)
                     .put("stage",s.stage).put("status",s.status).put("error",s.error).put("sas",s.request?.sas).put("request",s.request!=null)
                     .put("operation",s.operation).put("results",s.completedResults.size)
                     .put("peers",JSONArray(s.peers.map{JSONObject().put("name",it.name).put("address",it.address)}))
