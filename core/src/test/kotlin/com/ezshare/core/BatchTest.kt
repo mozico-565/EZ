@@ -29,4 +29,6 @@ class BatchTest {
         try{Socket("127.0.0.1",server.localPort).use{s->Connection(s,2000).use{c->val ch=SecureChannel(c,true,"sender",2);val bytes=ByteArrayOutputStream();DataOutputStream(bytes).apply{writeByte(20);writeText("test-session",64);writeText("",32);writeInt(1);writeText("third-party.apk",1024);writeText("application/octet-stream",128);writeLong(3)};ch.send(bytes.toByteArray());assertArrayEquals(byteArrayOf(2),ch.receive());ch.send(byteArrayOf(3,1,2,3));val end=ByteArrayOutputStream();DataOutputStream(end).apply{writeByte(4);writeLong(3);write(ByteArray(32))};ch.send(end.toByteArray());assertTrue(task.get(3,TimeUnit.SECONDS))}};assertFalse(committed);assertTrue(aborted)}finally{server.close();pool.shutdownNow()}
     }
 
+    @Test fun expiredReceiverNonceCannotOpenStorage(){val(result,output,counts)=transfer(listOf(ByteArray(70)),nonce="a".repeat(32),expectedNonce="");assertNull(result);assertTrue(output.isEmpty());assertEquals(0,counts.first)}
+
 }
