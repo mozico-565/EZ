@@ -30,7 +30,10 @@ def transfer(sender,receiver,qr=False,reject=False):
  state=receive(receiver)
  old=rpc(sender).get('operation');address=f'10.0.2.2:{data[receiver]}'
  if qr:
-  encoded=rpc(receiver,'qr',host='10.0.2.2',port=data[receiver])['qr'];rpc(sender,'send',qr=encoded)
+  encoded=rpc(receiver,'qr',host='10.0.2.2',port=data[receiver])['qr']
+  sender_now=rpc(sender)['epoch'];receiver_now=rpc(receiver)['epoch']
+  event('qr_bitmap_decoded',sender=sender,receiver=receiver,receiver_clock_ahead_seconds=receiver_now-sender_now)
+  rpc(sender,'send',qr=encoded)
  else:rpc(sender,'send',address=address)
  if args.baseline and sender=='B':
   s=rpc(sender)
