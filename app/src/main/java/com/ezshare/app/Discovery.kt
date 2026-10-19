@@ -50,11 +50,12 @@ class Discovery(context:Context,private val peers:(List<Peer>)->Unit,private val
         if(revisions[service.serviceName]!=revision){resolveNext(epoch);return}
         resolving=true
         val callback=object:NsdManager.ResolveListener{
-            override fun onResolveFailed(info:NsdServiceInfo,error:Int){synchronized(this@Discovery){if(epoch!=generation)return
-                resolving=false;status("تعذّر حل جهاز؛ استخدم الاتصال اليدوي أو أعد البحث");resolveNext(epoch)
+            override fun onResolveFailed(info:NsdServiceInfo,error:Int){synchronized(this@Discovery){
+                resolving=false;if(epoch!=generation){resolveNext(generation);return}
+                status("تعذّر حل جهاز؛ استخدم الاتصال اليدوي أو أعد البحث");resolveNext(epoch)
             }}
-            override fun onServiceResolved(info:NsdServiceInfo){synchronized(this@Discovery){if(epoch!=generation)return
-                resolving=false
+            override fun onServiceResolved(info:NsdServiceInfo){synchronized(this@Discovery){
+                resolving=false;if(epoch!=generation){resolveNext(generation);return}
                 val host=info.host?.hostAddress
                 if(revisions[service.serviceName]==revision&&host!=null&&!host.contains(':')&&info.port in 1024..65535){
                     found[service.serviceName]=Peer(service.serviceName,"$host:${info.port}");peers(found.values.toList())
@@ -64,7 +65,8 @@ class Discovery(context:Context,private val peers:(List<Peer>)->Unit,private val
         }
         try{nsd.resolveService(service,callback)}catch(_:Exception){resolving=false;status("تعذّر حل جهاز؛ أعد البحث");resolveNext(epoch)}
     }
-    @Synchronized fun stopDiscovery(){generation++;pending.clear();resolving=false;revisions.clear();found.clear()
+    @Synchronized fun stopDiscovery(){generation++;pending.clear();revisions.clear();found.clear()
+        // The legacy resolver remains occupied until its callback, even across searches.
         val old=discovery;discovery=null;old?.let{runCatching{nsd.stopServiceDiscovery(it)}};peers(emptyList())
     }
     @Synchronized fun stopAdvertising(){val old=registration;registration=null;old?.let{runCatching{nsd.unregisterService(it)}}}

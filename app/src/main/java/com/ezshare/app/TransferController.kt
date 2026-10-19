@@ -67,7 +67,10 @@ class TransferController(private val app:Application) {
     fun stopDiscovery(){discovery.stopDiscovery()}
     fun decide(accepted:Boolean){approval?.complete(accepted)}
     private fun ask(peer:String,sas:String,m:Metadata?,incoming:Boolean,files:List<Metadata> = emptyList()):Boolean=runBlocking {
+        val current=connection?:throw IOException("Connection closed before approval")
+        if(current.cancelled.get())throw IOException("Peer disconnected before approval")
         val decision=CompletableDeferred<Boolean>();approval=decision
+        if(current.cancelled.get())decision.completeExceptionally(IOException("Peer disconnected before approval"))
         _ui.update{it.copy(filename=m?.name?:it.picked?.metadata?.name.orEmpty(),request=PairRequest(peer,sas,m,incoming,files),files=files,peer=peer,incoming=incoming,status="قارن الرمز على الهاتفين ثم وافق",stage=if(incoming)"receive" else "send")}
         try {withTimeout(115_000){decision.await()}}finally{approval=null;_ui.update{it.copy(request=null)}}
     }
@@ -120,7 +123,7 @@ class TransferController(private val app:Application) {
             val (host,port)=parseLocalAddress(address);val socket=Socket();val c=Connection(socket);connection=c
             if(cancellationRequested)throw IOException("Cancelled");socket.connect(InetSocketAddress(host,port),10_000);c.touch();val connectNanos=System.nanoTime()-started
             val result=BatchEngine.send(c,identity,Manifest(files.map{it.metadata},pairingNonce=nonce),files.map{file->{(app.contentResolver.openInputStream(file.uri)?:throw IOException("لا يمكن فتح الملف")).also{activeStream=it}}},
-                {m,peer,sas->ask(peer,sas,m.files.firstOrNull(),false,m.files)},::batchProgress,::completed)
+                {m,peer,sas->ask(peer,sas,m.files.firstOrNull(),false,m.files)},::batchProgress,::completed,onPairingFailure={error->approval?.completeExceptionally(error)})
             finishBatch(result.copy(timings=(if(discoveryLatency>0)listOf(PhaseTiming("discovery_first_peer",-1,discoveryLatency)) else emptyList())+PhaseTiming("connection",-1,connectNanos)+result.timings))
         }catch(e:Exception){fail(e)}finally{synchronized(this@TransferController){runCatching{activeStream?.close()};activeStream=null;connection?.close();connection=null;_ui.update{it.copy(busy=false)};inUse.set(false);if(server==null)stopForeground()}}}
     }
