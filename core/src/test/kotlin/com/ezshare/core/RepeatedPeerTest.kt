@@ -36,4 +36,16 @@ class RepeatedPeerTest {
         }
         }finally{pool.shutdownNow()}
     }
+    @Test fun peerRejectionInterruptsPendingLocalApprovalWithoutProtocolChange(){
+        val pool=Executors.newCachedThreadPool();val decision=CompletableFuture<Boolean>()
+        ServerSocket(0).use{listener->
+            val receiver=pool.submit<Boolean>{listener.accept().use{s->Connection(s,2000).use{c->runCatching{BatchEngine.receive(c,"B","b".repeat(32),{_,_,_->error("Stale QR approved")},{error("Storage created")})}.isFailure}}}
+            try{Socket("127.0.0.1",listener.localPort).use{s->Connection(s,2000).use{c->
+                val start=System.nanoTime()
+                assertThrows(Exception::class.java){BatchEngine.send(c,"A",Manifest(listOf(Metadata("x","text/plain",0)),pairingNonce="a".repeat(32)),listOf({ByteArrayInputStream(byteArrayOf())}),{_,_,_->decision.get(4,TimeUnit.SECONDS)},onPairingFailure={decision.completeExceptionally(it)})}
+                assertTrue("Do not leave the local approval blocked",(System.nanoTime()-start)<2_000_000_000L)
+            }};assertTrue(receiver.get(3,TimeUnit.SECONDS))}finally{decision.complete(false);pool.shutdownNow()}
+        }
+    }
+
 }
