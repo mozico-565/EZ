@@ -88,13 +88,14 @@ try:
   for i in range(30):rpc('B','stop');rpc('B','receive')
   s=wait('B',lambda s:s['listening'] and s['port']>0);time.sleep(.3);assert rpc('B')['port']==s['port'];event('rapid_restart_30_survives')
   assert transfer('A','B')
-  rpc('A','discover');rpc('B','discover');time.sleep(3)
-  event('nsd_observed_under_isolated_emulator_nat',A=rpc('A')['peers'],B=rpc('B')['peers'],cross_device_multicast_verified=False)
+  receive('B');rpc('A','discover');time.sleep(3)
+  event('nsd_observed_under_isolated_emulator_nat',A=rpc('A')['peers'],receiver_listening=rpc('B')['listening'],cross_device_multicast_verified=False)
  event('suite_passed',baseline=args.baseline,physical_phones=False,optical_camera_verified=False)
 except Exception:
  event('suite_failed',traceback=traceback.format_exc());raise
 finally:
  for peer in serials:
+  (out/f'{peer}-before-shutdown.png').write_bytes(adb(peer,'exec-out','screencap','-p',check=False).stdout)
   try:rpc(peer,'shutdown')
   except Exception:pass
   (out/f'{peer}-logcat.txt').write_bytes(adb(peer,'logcat','-d','-v','threadtime',check=False).stdout)

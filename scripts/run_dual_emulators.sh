@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p network-evidence
+# Current command-line tools and emulator releases can choose different default
+# Android user directories. Give both an explicit AVD registry and content path.
+export ANDROID_USER_HOME="$RUNNER_TEMP/ez-android-home"
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+mkdir -p "$ANDROID_AVD_HOME"
+adb start-server
+trap 'adb -s emulator-5554 emu kill || true; adb -s emulator-5556 emu kill || true' EXIT
 sdkmanager 'system-images;android-29;google_apis;x86_64'
 for slot in A B; do
-  echo no | avdmanager create avd -n "EZ_$slot" -k 'system-images;android-29;google_apis;x86_64' --device pixel_2 --force
+  echo no | avdmanager create avd -n "EZ_$slot" -k 'system-images;android-29;google_apis;x86_64' --device pixel_2 --force --path "$ANDROID_AVD_HOME/EZ_$slot.avd"
+  test -f "$ANDROID_AVD_HOME/EZ_$slot.avd/config.ini"
+  printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-29\n' "$ANDROID_AVD_HOME/EZ_$slot.avd" > "$ANDROID_AVD_HOME/EZ_$slot.ini"
   port=5554; [ "$slot" = B ] && port=5556
   "$ANDROID_HOME/emulator/emulator" -avd "EZ_$slot" -port "$port" -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 1536 -cores 2 -camera-back none -camera-front none > "network-evidence/$slot-emulator.txt" 2>&1 &
 done
+"$ANDROID_HOME/emulator/emulator" -list-avds | tee network-evidence/avd-registry.txt
 for serial in emulator-5554 emulator-5556; do
   timeout 180 adb -s "$serial" wait-for-device
   timeout 240 bash -c 'until [ "$(adb -s "$1" shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done' _ "$serial"
