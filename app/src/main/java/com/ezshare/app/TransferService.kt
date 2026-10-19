@@ -15,7 +15,9 @@ class TransferService:Service(){
     }
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {if(intent?.action=="cancel"){(application as EZApplication).transfers.cancel();stopSelf()};return START_NOT_STICKY}
     override fun onBind(intent:Intent?):IBinder?=null
-    override fun onDestroy(){(application as EZApplication).transfers.serviceStopped();super.onDestroy()}
+    // Intentional stop/restart may destroy the old service after a new session starts.
+    // Cancellation belongs to the explicit notification action / timeout, not stale teardown.
+    override fun onDestroy(){super.onDestroy()}
     override fun onTimeout(startId:Int,fgsType:Int){(application as EZApplication).transfers.cancel();stopSelf()}
     companion object {fun start(context:Context){context.startForegroundService(Intent(context,TransferService::class.java))}}
 }
