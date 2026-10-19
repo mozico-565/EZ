@@ -19,10 +19,26 @@ object BatchEngine {
         requireProtocol(d.readUnsignedByte()==20,"Expected batch manifest");val id=d.readText(64);val nonce=d.readText(32);val n=d.readInt();requireProtocol(n in 1..256,"Invalid file count")
         Manifest(List(n){Metadata(d.readText(1024),d.readText(128),d.readLong())},id,nonce).also{it.validate();requireProtocol(d.available()==0,"Trailing manifest")}
     }
-    fun send(c:Connection,name:String,m:Manifest,sources:List<()->InputStream>,confirm:(Manifest,String,String)->Boolean,onProgress:(BatchProgress)->Unit={},onComplete:(Result)->Unit={}):BatchResult {
+    fun send(c:Connection,name:String,m:Manifest,sources:List<()->InputStream>,confirm:(Manifest,String,String)->Boolean,onProgress:(BatchProgress)->Unit={},onComplete:(Result)->Unit={},onPairingFailure:(Exception)->Unit={}):BatchResult {
         requireProtocol(sources.size==m.files.size,"Source manifest mismatch");val encoded=manifestBytes(m);val start=System.nanoTime();val times=mutableListOf<PhaseTiming>();val results=mutableListOf<Result>()
         val hs=System.nanoTime();val ch=SecureChannel(c,true,name,2);times+=PhaseTiming("handshake",-1,System.nanoTime()-hs);c.approvalWindow();ch.send(encoded)
-        val approveStart=System.nanoTime();requireProtocol(confirm(m,ch.peerName,ch.sas),"Pairing rejected locally");requireProtocol(ch.receive().contentEquals(byteArrayOf(2)),"Receiver rejected the transfer");times+=PhaseTiming("approval",-1,System.nanoTime()-approveStart)
+        val approveStart=System.nanoTime()
+        // Read the peer decision while the local approval UI is open. Otherwise a
+        // rejected/expired QR or disconnected peer leaves that UI blocked until timeout.
+        // Exactly one reader owns rx here; join it before reading any file receipts.
+        val remote=java.util.concurrent.CompletableFuture<Unit>()
+        val approvalReader=Thread({
+            try{requireProtocol(ch.receive().contentEquals(byteArrayOf(2)),"Receiver rejected the transfer");remote.complete(Unit)}
+            catch(e:Exception){c.close();runCatching{onPairingFailure(e)};remote.completeExceptionally(e)}
+        },"ez-pairing-decision").apply{isDaemon=true;start()}
+        try{
+            requireProtocol(confirm(m,ch.peerName,ch.sas),"Pairing rejected locally")
+            try{remote.get()}catch(e:java.util.concurrent.ExecutionException){throw (e.cause as? Exception?:IOException("Peer pairing failed",e))}
+        }catch(e:Exception){c.close();throw e}finally{
+            if(!remote.isDone)c.close()
+            approvalReader.join(1000)
+        }
+        times+=PhaseTiming("approval",-1,System.nanoTime()-approveStart)
         var completedBytes=0L;var streamingNanos=0L
         m.files.forEachIndexed{i,meta->
             onProgress(BatchProgress(Progress(completedBytes,m.total,streamingNanos,0.0),i,m.files.size,meta.name,i,"preparing"))
