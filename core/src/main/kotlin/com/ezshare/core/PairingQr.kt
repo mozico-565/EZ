@@ -15,7 +15,9 @@ data class PairingQr(val host:String,val port:Int,val nonce:String,val expires:L
             val host=fields.getValue("host");requireProtocol(host.matches(Regex("[0-9]{1,3}(\\.[0-9]{1,3}){3}")),"Numeric local IPv4 required");val octets=host.split('.').map{it.toInt()};requireProtocol(octets.all{it in 0..255},"Invalid address")
             requireProtocol(octets[0]==10||octets[0]==192&&octets[1]==168||octets[0]==172&&octets[1] in 16..31||octets[0]==169&&octets[1]==254,"Local address required")
             val port=fields["port"]?.toIntOrNull()?:0;requireProtocol(port in 1024..65535,"Invalid port");val nonce=fields.getValue("nonce");requireProtocol(nonce.matches(Regex("[a-f0-9]{32}")),"Invalid nonce")
-            val expiry=fields["expires"]?.toLongOrNull()?:0;requireProtocol(expiry>now&&expiry-now<=600,"QR expired or invalid lifetime");return PairingQr(host,port,nonce,expiry)
+            val expiry=fields["expires"]?.toLongOrNull()?:0;// Receiver-side expiry and live nonce remain authoritative. A fresh ten-minute
+            // QR must tolerate a receiver clock slightly ahead of the scanner's clock.
+            requireProtocol(expiry>now&&expiry-now<=600+120,"QR expired or invalid lifetime");return PairingQr(host,port,nonce,expiry)
         }
     }
 }
