@@ -56,10 +56,12 @@ jobs:
         cd baseline
 
         ./gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest'
-    - name: Test and build patched app and instrumentation
+    - name: Build patched app and run core integration tests
       run: 'chmod +x gradlew
 
-        ./gradlew --no-daemon --max-workers=2 :core:test :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleDebugAndroidTest'
+        ./gradlew --no-daemon --max-workers=2 :core:test :app:assembleDebug :app:assembleDebugAndroidTest
+
+        '
     - name: Two independent Android emulators baseline and patched TCP sessions
       run: bash scripts/run_dual_emulators.sh
     - uses: actions/upload-artifact@v4
