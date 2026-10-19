@@ -53,7 +53,7 @@ try:
  for peer in serials:
   adb(peer,'forward',f'tcp:{controls[peer]}','tcp:39441')
   f=(out/f'{peer}-instrumentation.txt').open('wb')
-  processes.append(subprocess.Popen(['adb','-s',serials[peer],'shell','am','instrument','-w','-r','-e','class','com.ezshare.app.NetworkPeerHarnessTest','com.ezshare.app.test/androidx.test.runner.AndroidJUnitRunner'],stdout=f,stderr=subprocess.STDOUT))
+  processes.append(subprocess.Popen(['adb','-s',serials[peer],'shell','am','instrument','-w','-r','-e','class','com.ezshare.app.NetworkPeerHarnessTest','-e','ez_peer_harness','true','com.ezshare.app.test/androidx.test.runner.AndroidJUnitRunner'],stdout=f,stderr=subprocess.STDOUT))
   wait(peer,lambda s:True,120)
  assert transfer('A','B')
  if args.baseline:
@@ -74,7 +74,17 @@ try:
   assert transfer('A','B',qr=True)
   rpc('A','expiredScan');assert rpc('A').get('error');event('expired_qr_visible_error')
   rpc('A','send',address='10.0.2.2:45999');wait('A',lambda s:not s['busy'] and bool(s.get('error')));event('connection_refused_visible_error')
-  assert transfer('A','B',reject=True);assert transfer('A','B',qr=True)
+  assert transfer('A','B',reject=True)
+  before=len([h for h in rpc('B')['history'] if h['incoming'] and h['status']=='completed'])
+  receive('B');rpc('A','send',address=f'10.0.2.2:{data["B"]}',size=64*1024*1024)
+  a=wait('A',lambda s:s['request']);b=wait('B',lambda s:s['request']);assert a['sas']==b['sas']
+  rpc('A','decide',accept=True);rpc('B','decide',accept=True)
+  wait('B',lambda s:s['busy'] and s['status']=='جارٍ النقل الفعلي…');rpc('B','cancel')
+  wait('A',lambda s:not s['busy'] and bool(s.get('error')));b=wait('B',lambda s:not s['busy'])
+  after=len([h for h in b['history'] if h['incoming'] and h['status']=='completed'])
+  assert before==after and b['results']==0
+  event('interrupted_transfer_not_completed',completed_files_before=before,completed_files_after=after)
+  assert transfer('A','B',qr=True)
   for i in range(30):rpc('B','stop');rpc('B','receive')
   s=wait('B',lambda s:s['listening'] and s['port']>0);time.sleep(.3);assert rpc('B')['port']==s['port'];event('rapid_restart_30_survives')
   assert transfer('A','B')
