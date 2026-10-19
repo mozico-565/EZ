@@ -18,6 +18,7 @@ import java.security.MessageDigest
 /** Test-APK-only command port. Never shipped in the application APK. No automatic approval. */
 class NetworkPeerHarnessTest {
     @Test fun controlledPeer(){
+        org.junit.Assume.assumeTrue("Dedicated dual-emulator driver required",InstrumentationRegistry.getArguments().getString("ez_peer_harness")=="true")
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val app=instrumentation.targetContext.applicationContext as EZApplication
         val controller=app.transfers
