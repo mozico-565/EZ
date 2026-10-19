@@ -80,6 +80,8 @@ class TransferController(private val app:Application) {
         val listener=try{ServerSocket(0)}catch(e:Exception){fail(e);return}
         server=listener
         val nonce=UUID.randomUUID().toString().replace("-","");val expiry=System.currentTimeMillis()/1000+600
+        // Enforce the real ten-minute lifetime even if wall time is corrected by the OS.
+        val receiverDeadline=android.os.SystemClock.elapsedRealtime()+600_000L
         try{runForeground()}catch(e:Exception){server=null;listener.close();fail(e);return}
         stopDiscovery()
         _ui.update{it.copy(pairingNonce=nonce,pairingExpiry=expiry,listening=true,port=listener.localPort,status="بانتظار طلب · قارن الرمز قبل القبول",error=null,stage="receive",result=null)}
@@ -94,8 +96,8 @@ class TransferController(private val app:Application) {
                     _ui.update{it.copy(operation=UUID.randomUUID().toString(),completedResults=emptyList(),timings=emptyList(),files=emptyList(),filename="",fileIndex=0,busy=true,progress=null,result=null,error=null,incoming=true,peer="")}
                     scope.launch {
                         try{if(cancellationRequested)throw IOException("Cancelled")
-                            val result=BatchEngine.receive(c,identity,if(System.currentTimeMillis()/1000<expiry)nonce else "",{m,peer,sas->
-                                if(m.pairingNonce.isNotBlank()&&System.currentTimeMillis()/1000>=expiry)throw ProtocolException("QR session expired")
+                            val result=BatchEngine.receive(c,identity,if(android.os.SystemClock.elapsedRealtime()<receiverDeadline)nonce else "",{m,peer,sas->
+                                if(m.pairingNonce.isNotBlank()&&android.os.SystemClock.elapsedRealtime()>=receiverDeadline)throw ProtocolException("QR session expired")
                                 ask(peer,sas,m.files.firstOrNull(),true,m.files)
                             },{m->MediaStorePending(app,m){activeStream=it}},::batchProgress,::completed)
                             finishBatch(result)
