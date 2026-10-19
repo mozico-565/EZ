@@ -10,6 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.ClassName
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
 import java.net.InetAddress
@@ -18,6 +19,7 @@ import java.net.InetAddress
 @Config(sdk=[29],shadows=[DiscoveryRegressionTest.NsdShadow::class])
 class DiscoveryRegressionTest {
     @Implements(NsdManager::class) class NsdShadow {
+        @Implementation fun __constructor__(context:Context,@ClassName("android.net.nsd.INsdManager") service:Any?){}
         companion object {val searches=mutableListOf<NsdManager.DiscoveryListener>();val resolves=mutableListOf<Pair<NsdServiceInfo,NsdManager.ResolveListener>>()}
         @Implementation fun discoverServices(type:String,protocol:Int,listener:NsdManager.DiscoveryListener){searches+=listener}
         @Implementation fun stopServiceDiscovery(listener:NsdManager.DiscoveryListener){}
